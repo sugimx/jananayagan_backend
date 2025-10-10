@@ -6,7 +6,14 @@ const connectDB = require('./config/database');
 const app = express();
 
 // Middleware
-app.use(cors());
+// CORS configuration to allow all origins and ports
+app.use(cors({
+  origin: '*', // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: false, // Set to false when using origin: '*'
+  optionsSuccessStatus: 200
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
