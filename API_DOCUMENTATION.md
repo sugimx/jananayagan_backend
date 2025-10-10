@@ -160,7 +160,7 @@
     {
       "productId": "product_id",
       "productName": "Product Name",
-      "quantity": 2,
+      "quantity": 1,
       "price": 100
     }
   ],
