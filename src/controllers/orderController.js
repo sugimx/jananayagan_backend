@@ -75,7 +75,7 @@ exports.createOrder = async (req, res) => {
       };
     });
 
-    const shippingCharges = totalAmount > 1000 ? 0 : 50; // Free shipping above 1000
+    const shippingCharges = totalAmount > 1000 ? 0 : 50; 
     const finalAmount = totalAmount + shippingCharges;
 
     // Create order

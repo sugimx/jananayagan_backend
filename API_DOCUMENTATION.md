@@ -83,8 +83,7 @@
 {
   "firstName": "John",
   "lastName": "Doe",
-  "dateOfBirth": "1990-01-01",
-  "bio": "Optional bio"
+  "dateOfBirth": "1990-01-01"
 }
 ```
 

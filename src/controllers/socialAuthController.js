@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Profile = require('../models/Profile');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
@@ -59,7 +60,47 @@ exports.googleAuth = async (req, res) => {
         googleId: id,
         isProfileComplete: false, // User needs to complete profile
         password: '', // No password for social auth users
+        profilePicture: picture || null,
       });
+
+      // Create default user profile automatically
+      try {
+        const profileData = {
+          user: user._id,
+          profileType: 'user',
+          status: 'active',
+          dateOfBirth: null,
+          profileImage: picture || null,
+        };
+
+        // Only set these fields if they have values
+        if (name) profileData.name = name;
+        if (email) profileData.gmail = email;
+
+        await Profile.create(profileData);
+        console.log('Profile created successfully for Google user:', user._id);
+
+        // Update user's profile completion status
+        user.isProfileComplete = true;
+        await user.save();
+      } catch (profileError) {
+        console.error('Error creating profile for Google user:', profileError);
+        console.error('Profile error details:', {
+          message: profileError.message,
+          code: profileError.code,
+          keyPattern: profileError.keyPattern,
+          keyValue: profileError.keyValue
+        });
+        
+        // Delete the user if profile creation fails
+        await User.findByIdAndDelete(user._id);
+        
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create user profile. Please try again.',
+          error: profileError.message
+        });
+      }
     }
 
     res.json({

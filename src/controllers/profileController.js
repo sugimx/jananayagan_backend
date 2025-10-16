@@ -1,45 +1,30 @@
 const Profile = require('../models/Profile');
 const User = require('../models/User');
 
-// @desc    Create user profile
-// @route   POST /api/profiles
+// ==================== USER PROFILE ENDPOINTS ====================
+
+// @desc    Get user profile (main profile only)
+// @route   GET /api/profiles/user
 // @access  Private
-exports.createProfile = async (req, res) => {
+exports.getUserProfile = async (req, res) => {
   try {
-    const { firstName, lastName, dateOfBirth, bio } = req.body;
-
-    // Validate required fields
-    if (!firstName || !lastName || !dateOfBirth) {
-      return res.status(400).json({
-        success: false,
-        message: 'All fields (firstName, lastName, dateOfBirth) are required',
-      });
-    }
-
-    // Check if profile already exists
-    const existingProfile = await Profile.findOne({ user: req.user._id });
-    if (existingProfile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Profile already exists for this user',
-      });
-    }
-
-    // Create profile
-    const profile = await Profile.create({
-      user: req.user._id,
-      firstName,
-      lastName,
-      dateOfBirth,
-      bio: bio || '',
+    const profile = await Profile.findOne({ 
+      user: req.user._id, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } // Legacy profiles
+      ]
     });
 
-    // Update user's profile completion status
-    await User.findByIdAndUpdate(req.user._id, { isProfileComplete: true });
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'User profile not found',
+      });
+    }
 
-    res.status(201).json({
+    res.json({
       success: true,
-      message: 'Profile created successfully',
       data: profile,
     });
   } catch (error) {
@@ -50,12 +35,255 @@ exports.createProfile = async (req, res) => {
   }
 };
 
-// @desc    Get user profile
+// @desc    Update user profile
+// @route   PUT /api/profiles/user
+// @access  Private
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+
+    const profile = await Profile.findOne({ 
+      user: req.user._id, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } // Legacy profiles
+      ]
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'User profile not found',
+      });
+    }
+
+    // Update profile fields
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+    if (profileImage !== undefined) updateData.profileImage = profileImage;
+    if (phone) updateData.phone = phone;
+    if (gmail) updateData.gmail = gmail;
+    if (status) updateData.status = status;
+    if (dist) updateData.dist = dist;
+    if (state) updateData.state = state;
+    
+    // Ensure profileType is set to 'user' (for legacy profiles)
+    updateData.profileType = 'user';
+    
+    const updatedProfile = await Profile.findByIdAndUpdate(
+      profile._id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'User profile updated successfully',
+      data: updatedProfile,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==================== BUYER PROFILE ENDPOINTS ====================
+
+// @desc    Create buyer profile
+// @route   POST /api/profiles/buyer
+// @access  Private
+exports.createBuyerProfile = async (req, res) => {
+  try {
+    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+
+    // Create buyer profile
+    const buyerProfile = await Profile.create({
+      user: req.user._id,
+      profileType: 'buyer',
+      name: name || '',
+      dateOfBirth: dateOfBirth || null,
+      profileImage: profileImage || null,
+      phone: phone || '',
+      gmail: gmail || '',
+      status: status || 'active',
+      dist: dist || '',
+      state: state || ''
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Buyer profile created successfully',
+      data: buyerProfile,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get all buyer profiles
+// @route   GET /api/profiles/buyer
+// @access  Private
+exports.getBuyerProfiles = async (req, res) => {
+  try {
+    const buyerProfiles = await Profile.find({ 
+      user: req.user._id, 
+      profileType: 'buyer' 
+    }).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: buyerProfiles.length,
+      data: buyerProfiles,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Update buyer profile
+// @route   PUT /api/profiles/buyer/:id
+// @access  Private
+exports.updateBuyerProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+
+    // Check if buyer profile exists and belongs to user
+    const buyerProfile = await Profile.findOne({ 
+      _id: id, 
+      user: req.user._id, 
+      profileType: 'buyer' 
+    });
+
+    if (!buyerProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Buyer profile not found',
+      });
+    }
+
+    // Update profile fields
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+    if (profileImage !== undefined) updateData.profileImage = profileImage;
+    if (phone) updateData.phone = phone;
+    if (gmail) updateData.gmail = gmail;
+    if (status) updateData.status = status;
+    if (dist) updateData.dist = dist;
+    if (state) updateData.state = state;
+    
+    const updatedProfile = await Profile.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Buyer profile updated successfully',
+      data: updatedProfile,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Delete buyer profile
+// @route   DELETE /api/profiles/buyer/:id
+// @access  Private
+exports.deleteBuyerProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const buyerProfile = await Profile.findOneAndDelete({ 
+      _id: id, 
+      user: req.user._id, 
+      profileType: 'buyer' 
+    });
+
+    if (!buyerProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Buyer profile not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Buyer profile deleted successfully',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==================== GET ALL PROFILES ====================
+
+// @desc    Get all profiles (user profile + all buyer profiles)
+// @route   GET /api/profiles/all
+// @access  Private
+exports.getAllProfiles = async (req, res) => {
+  try {
+    // Get user profile (including legacy profiles without profileType)
+    const userProfile = await Profile.findOne({ 
+      user: req.user._id, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } // Legacy profiles
+      ]
+    });
+
+    // Get all buyer profiles
+    const buyerProfiles = await Profile.find({ 
+      user: req.user._id, 
+      profileType: 'buyer' 
+    }).sort({ createdAt: -1 });
+
+    // Combine user profile and buyer profiles into a single array
+    const allProfiles = userProfile ? [userProfile, ...buyerProfiles] : buyerProfiles;
+
+    res.json({
+      buyerProfiles: allProfiles,
+      totalBuyerProfiles: allProfiles.length,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ==================== LEGACY ENDPOINTS (Keep for backward compatibility) ====================
+
+// @desc    Get user profile (legacy - returns user profile only)
 // @route   GET /api/profiles
 // @access  Private
 exports.getProfile = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ user: req.user._id });
+    const profile = await Profile.findOne({ 
+      user: req.user._id, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } // Legacy profiles
+      ]
+    });
 
     if (!profile) {
       return res.status(404).json({
@@ -76,14 +304,20 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// @desc    Update user profile
+// @desc    Update user profile (legacy)
 // @route   PUT /api/profiles
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { firstName, lastName, dateOfBirth, bio, profileImage, preferences } = req.body;
+    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
 
-    const profile = await Profile.findOne({ user: req.user._id });
+    const profile = await Profile.findOne({ 
+      user: req.user._id, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } // Legacy profiles
+      ]
+    });
 
     if (!profile) {
       return res.status(404).json({
@@ -94,15 +328,20 @@ exports.updateProfile = async (req, res) => {
 
     // Update profile fields
     const updateData = {};
-    if (firstName) updateData.firstName = firstName;
-    if (lastName) updateData.lastName = lastName;
+    if (name !== undefined) updateData.name = name;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
-    if (bio !== undefined) updateData.bio = bio;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
-    if (preferences) updateData.preferences = preferences;
-
-    const updatedProfile = await Profile.findOneAndUpdate(
-      { user: req.user._id },
+    if (phone) updateData.phone = phone;
+    if (gmail) updateData.gmail = gmail;
+    if (status) updateData.status = status;
+    if (dist) updateData.dist = dist;
+    if (state) updateData.state = state;
+    
+    // Ensure profileType is set to 'user' (for legacy profiles)
+    updateData.profileType = 'user';
+    
+    const updatedProfile = await Profile.findByIdAndUpdate(
+      profile._id,
       updateData,
       { new: true, runValidators: true }
     );
@@ -120,12 +359,18 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// @desc    Delete user profile
+// @desc    Delete user profile (legacy - not recommended)
 // @route   DELETE /api/profiles
 // @access  Private
 exports.deleteProfile = async (req, res) => {
   try {
-    const profile = await Profile.findOneAndDelete({ user: req.user._id });
+    const profile = await Profile.findOneAndDelete({ 
+      user: req.user._id, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } // Legacy profiles
+      ]
+    });
 
     if (!profile) {
       return res.status(404).json({

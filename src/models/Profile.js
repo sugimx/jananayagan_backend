@@ -5,42 +5,74 @@ const profileSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true,
   },
-  firstName: {
+  profileType: {
     type: String,
-    required: [true, 'Please add a first name'],
-    trim: true,
+    enum: ['user', 'buyer'],
+    default: 'user',
+    required: true,
   },
-  lastName: {
+  name: {
     type: String,
-    required: [true, 'Please add a last name'],
+    required: false,
     trim: true,
+    default: null,
   },
   dateOfBirth: {
     type: Date,
-    required: [true, 'Please add date of birth'],
+    required: false,
+    default: null,
   },
   profileImage: {
     type: String,
     default: null,
   },
-  // Buyer profile picture (allows duplicates)
-  buyerProfileImage: {
+
+  phone: {
     type: String,
+    required: false,
+    trim: true,
+    unique: true,
+    sparse: true,
+  },
+  gmail: {
+    type: String,
+    required: false,
+    trim: true,
+    lowercase: true,
+    unique: true,
+    sparse: true,
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'pending', 'suspended'],
+    default: 'active',
+  },
+  dist: {
+    type: String,
+    required: false,
+    trim: true,
     default: null,
   },
-  // Profile picture hash for duplicate detection
-  profileImageHash: {
+  state: {
     type: String,
-    sparse: true,
-  }
+    required: false,
+    trim: true,
+    default: null,
+  },
 }, {
   timestamps: true,
 });
 
+// Compound index: one user can have only one 'user' profile type, but multiple 'buyer' profiles
+profileSchema.index({ user: 1, profileType: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { profileType: 'user' } 
+});
+
 // Index for faster queries
 profileSchema.index({ user: 1 });
-profileSchema.index({ profileImageHash: 1 }, { unique: true, sparse: true });
+profileSchema.index({ phone: 1 }, { unique: true, sparse: true });
+profileSchema.index({ gmail: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Profile', profileSchema);
