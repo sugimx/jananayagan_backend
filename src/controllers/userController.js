@@ -16,7 +16,7 @@ exports.registerUser = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
 
-    // Validate required fields
+
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ 
         success: false, 
@@ -24,7 +24,6 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // Check if user exists by email
     const userExists = await User.findOne({ email });
 
     if (userExists) {
@@ -34,7 +33,7 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // Check if user exists by phone
+   
     const phoneExists = await User.findOne({ phone });
 
     if (phoneExists) {
@@ -44,17 +43,17 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    // Create user
+   
     const user = await User.create({
       name,
       email,
       phone,
       password,
-      isProfileComplete: false, // Will be updated after profile creation
+      isProfileComplete: false,
     });
 
     if (user) {
-      // Create default user profile and buyer profile automatically
+      
       try {
         // Build user profile data
         const userProfileData = {

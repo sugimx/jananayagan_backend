@@ -20,7 +20,6 @@ exports.createAddress = async (req, res) => {
       instructions,
     } = req.body;
 
-    // Validate required fields
     if (!fullName || !phone || !addressLine1 || !city || !state || !postalCode) {
       return res.status(400).json({
         success: false,

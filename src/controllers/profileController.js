@@ -46,7 +46,7 @@ exports.updateUserProfile = async (req, res) => {
       user: req.user._id, 
       $or: [
         { profileType: 'user' },
-        { profileType: { $exists: false } } // Legacy profiles
+        { profileType: { $exists: false } } 
       ]
     });
 
@@ -57,7 +57,7 @@ exports.updateUserProfile = async (req, res) => {
       });
     }
 
-    // Update profile fields
+    
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
@@ -68,7 +68,7 @@ exports.updateUserProfile = async (req, res) => {
     if (dist) updateData.dist = dist;
     if (state) updateData.state = state;
     
-    // Ensure profileType is set to 'user' (for legacy profiles)
+    
     updateData.profileType = 'user';
     
     const updatedProfile = await Profile.findByIdAndUpdate(
@@ -97,20 +97,75 @@ exports.updateUserProfile = async (req, res) => {
 // @access  Private
 exports.createBuyerProfile = async (req, res) => {
   try {
+    console.log('=== CREATE BUYER PROFILE DEBUG ===');
+    console.log('Request headers:', req.headers);
+    console.log('Request body:', req.body);
+    console.log('Request body type:', typeof req.body);
+    console.log('Request body keys:', Object.keys(req.body || {}));
+    
     const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+
+    console.log('Destructured values:', {
+      name: name,
+      phone: phone,
+      gmail: gmail,
+      nameType: typeof name,
+      phoneType: typeof phone,
+      gmailType: typeof gmail
+    });
+
+    // Validate required fields - check for empty strings and null/undefined
+    if (!name || name.trim() === '' || !phone || phone.trim() === '' || !gmail || gmail.trim() === '') {
+      console.log('Validation failed:', {
+        name: !!name,
+        phone: !!phone,
+        gmail: !!gmail,
+        nameValue: name,
+        phoneValue: phone,
+        gmailValue: gmail,
+        nameTrimmed: name?.trim(),
+        phoneTrimmed: phone?.trim(),
+        gmailTrimmed: gmail?.trim()
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Name, phone, and email are required fields'
+      });
+    }
+
+    // Check if phone or email already exists in any profile
+    // if (phone) {
+    //   const existingPhone = await Profile.findOne({ phone: phone.trim() });
+    //   if (existingPhone) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: 'A profile with this phone number already exists'
+    //     });
+    //   }
+    // }
+
+    // if (gmail) {
+    //   const existingEmail = await Profile.findOne({ gmail: gmail.toLowerCase().trim() });
+    //   if (existingEmail) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: 'A profile with this email already exists'
+    //     });
+    //   }
+    // }
 
     // Create buyer profile
     const buyerProfile = await Profile.create({
       user: req.user._id,
       profileType: 'buyer',
-      name: name || '',
+      name: name.trim() || null,
       dateOfBirth: dateOfBirth || null,
       profileImage: profileImage || null,
-      phone: phone || '',
-      gmail: gmail || '',
+      phone: phone.trim() || null,
+      gmail: gmail.toLowerCase().trim() || null,
       status: status || 'active',
-      dist: dist || '',
-      state: state || ''
+      dist: dist.trim() || null,
+      state: state.trim() || null
     });
 
     res.status(201).json({
