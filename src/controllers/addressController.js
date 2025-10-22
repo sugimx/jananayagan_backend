@@ -5,19 +5,20 @@ const Address = require('../models/Address');
 // @access  Private
 exports.createAddress = async (req, res) => {
   try {
+    console.log('Request body:', req.body);
+    console.log('User id:', req.user?._id);
+
     const {
       type,
       isDefault,
       fullName,
       phone,
       addressLine1,
-      addressLine2,
       city,
       state,
       postalCode,
       country,
-      landmark,
-      instructions,
+      landmark
     } = req.body;
 
     if (!fullName || !phone || !addressLine1 || !city || !state || !postalCode) {
@@ -34,13 +35,11 @@ exports.createAddress = async (req, res) => {
       fullName,
       phone,
       addressLine1,
-      addressLine2,
       city,
       state,
       postalCode,
       country: country || 'India',
-      landmark,
-      instructions,
+      landmark
     });
 
     res.status(201).json({
@@ -49,12 +48,14 @@ exports.createAddress = async (req, res) => {
       data: address,
     });
   } catch (error) {
+    console.error('Create address error:', error);  
     res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
 
 // @desc    Get all user addresses
 // @route   GET /api/addresses

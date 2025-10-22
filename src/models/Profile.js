@@ -32,7 +32,6 @@ const profileSchema = new mongoose.Schema({
     type: String,
     required: false,
     trim: true,
-    unique: true,
     sparse: true,
   },
   gmail: {
@@ -40,7 +39,6 @@ const profileSchema = new mongoose.Schema({
     required: false,
     trim: true,
     lowercase: true,
-    unique: true,
     sparse: true,
   },
   status: {
@@ -72,7 +70,6 @@ profileSchema.index({ user: 1, profileType: 1 }, {
 
 // Index for faster queries
 profileSchema.index({ user: 1 });
-profileSchema.index({ phone: 1 }, { unique: true, sparse: true });
-profileSchema.index({ gmail: 1 }, { unique: true, sparse: true });
+
 
 module.exports = mongoose.model('Profile', profileSchema);

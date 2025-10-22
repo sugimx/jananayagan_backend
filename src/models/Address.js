@@ -27,7 +27,6 @@ const addressSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add address line 1'],
   },
-  addressLine2: String,
   city: {
     type: String,
     required: [true, 'Please add city'],
@@ -44,8 +43,10 @@ const addressSchema = new mongoose.Schema({
     type: String,
     default: 'India',
   },
-  landmark: String,
-  instructions: String,
+ landmark: {
+    type: String,
+    default: '',
+  }
 }, {
   timestamps: true,
 });
