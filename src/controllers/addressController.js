@@ -16,12 +16,13 @@ exports.createAddress = async (req, res) => {
       addressLine1,
       city,
       state,
+      district,
       postalCode,
       country,
       landmark
     } = req.body;
 
-    if (!fullName || !phone || !addressLine1 || !city || !state || !postalCode) {
+    if (!fullName || !phone || !addressLine1 || !city || !state || !district || !postalCode) {
       return res.status(400).json({
         success: false,
         message: 'Required fields: fullName, phone, addressLine1, city, state, postalCode',
@@ -35,6 +36,7 @@ exports.createAddress = async (req, res) => {
       fullName,
       phone,
       addressLine1,
+      district,
       city,
       state,
       postalCode,
@@ -117,13 +119,12 @@ exports.updateAddress = async (req, res) => {
       fullName,
       phone,
       addressLine1,
-      addressLine2,
       city,
       state,
+      district,
       postalCode,
       country,
       landmark,
-      instructions,
     } = req.body;
 
     const address = await Address.findOne({
@@ -146,13 +147,12 @@ exports.updateAddress = async (req, res) => {
         fullName,
         phone,
         addressLine1,
-        addressLine2,
+        district,
         city,
         state,
         postalCode,
-        country,
+        country: country || 'India',
         landmark,
-        instructions,
       },
       { new: true, runValidators: true }
     );

@@ -35,6 +35,10 @@ const addressSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add state'],
   },
+  district: {
+    type: String,
+    required: [true, 'Please add district'],
+  },
   postalCode: {
     type: String,
     required: [true, 'Please add postal code'],
