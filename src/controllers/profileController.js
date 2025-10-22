@@ -12,7 +12,7 @@ exports.getUserProfile = async (req, res) => {
       user: req.user._id, 
       $or: [
         { profileType: 'user' },
-        { profileType: { $exists: false } } // Legacy profiles
+        { profileType: { $exists: false } } 
       ]
     });
 
