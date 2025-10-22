@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const Address = require('../models/Address');
 const crypto = require('crypto');
+const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 
 // PhonePe configuration
 const PHONEPE_CONFIG = {
@@ -60,20 +61,35 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Calculate totals
+    // Calculate totals and generate mug serials
     let totalAmount = 0;
-    const orderItems = items.map(item => {
+    const orderItems = [];
+    
+    for (const item of items) {
       const itemTotal = item.quantity * item.price;
       totalAmount += itemTotal;
       
-      return {
+      const orderItem = {
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
         price: item.price,
         totalPrice: itemTotal,
       };
-    });
+      
+      // Generate mug serial if this is a mug product and bike number is provided
+      if (item.isMug && item.bikeNumber) {
+        try {
+          const mugSerials = await generateMultipleMugSerials(item.bikeNumber, item.quantity);
+          orderItem.mugSerial = mugSerials.join(','); // Store multiple serials as comma-separated string
+        } catch (error) {
+          console.error('Error generating mug serials:', error);
+          // Continue without mug serial if generation fails
+        }
+      }
+      
+      orderItems.push(orderItem);
+    }
 
     const shippingCharges = totalAmount > 1000 ? 0 : 50; 
     const finalAmount = totalAmount + shippingCharges;

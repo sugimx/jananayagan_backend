@@ -114,7 +114,7 @@ exports.createBuyerProfile = async (req, res) => {
       gmailType: typeof gmail
     });
 
-    // Validate required fields - check for empty strings and null/undefined
+  
     if (!name || name.trim() === '' || !phone || phone.trim() === '' || !gmail || gmail.trim() === '') {
       console.log('Validation failed:', {
         name: !!name,

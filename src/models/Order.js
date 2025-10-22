@@ -34,6 +34,10 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       required: true,
     },
+    mugSerial: {
+      type: String,
+      required: false, // Only for mug products
+    },
   }],
   shippingAddress: {
     fullName: {
