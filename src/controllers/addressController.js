@@ -11,7 +11,6 @@ exports.createAddress = async (req, res) => {
     const {
       type,
       isDefault,
-      fullName,
       phone,
       addressLine1,
       city,
@@ -22,10 +21,10 @@ exports.createAddress = async (req, res) => {
       landmark
     } = req.body;
 
-    if (!fullName || !phone || !addressLine1 || !city || !state || !district || !postalCode) {
+    if (!phone || !addressLine1 || !city || !state || !district || !postalCode) {
       return res.status(400).json({
         success: false,
-        message: 'Required fields: fullName, phone, addressLine1, city, state, postalCode',
+        message: 'Required fields: phone, addressLine1, city, state, postalCode',
       });
     }
 
@@ -33,7 +32,7 @@ exports.createAddress = async (req, res) => {
       user: req.user._id,
       type: type || 'home',
       isDefault: isDefault || false,
-      fullName,
+      fullName: req.user.name,
       phone,
       addressLine1,
       district,
@@ -116,7 +115,6 @@ exports.updateAddress = async (req, res) => {
     const {
       type,
       isDefault,
-      fullName,
       phone,
       addressLine1,
       city,
@@ -144,7 +142,6 @@ exports.updateAddress = async (req, res) => {
       {
         type,
         isDefault,
-        fullName,
         phone,
         addressLine1,
         district,
