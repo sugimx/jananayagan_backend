@@ -190,20 +190,7 @@ exports.getUserProfile = async (req, res) => {
 
       // If no profile exists, create one with default values
       let userProfile = profile;
-      if (!profile) {
-        console.log('No profile found, creating default profile for user:', req.user._id);
-        userProfile = await Profile.create({
-          user: req.user._id,
-          profileType: 'user',
-          status: 'active',
-          state: userProfile?.state||'',
-          dist: userProfile?.dist||'',
-          dob: userProfile?.dateOfBirth||'',
-          name: user.name,
-          phone: user.phone,
-          gmail: user.email,
-        });
-      }
+      
 
       // Format date to YYYY-MM-DD (remove time)
       const formatDate = (date) => {
@@ -222,7 +209,7 @@ exports.getUserProfile = async (req, res) => {
           isProfileComplete: user.isProfileComplete,
           state: userProfile?.state||'',
           dist: userProfile?.dist||'',
-          dob:  formatDate(userProfile.dateOfBirth),
+          dob:formatDate(userProfile.dateOfBirth) || '',
         },
       });
     } else {
@@ -231,6 +218,104 @@ exports.getUserProfile = async (req, res) => {
         message: 'User not found' 
       });
     }
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// @desc    Update user profile
+// @route   PUT /api/users/profile
+// @access  Private
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const { name, email, phone, state, dist, dob } = req.body;
+    const userId = req.user._id;
+
+    // Find the user
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    // Update user fields if provided
+    if (name) user.name = name;
+    
+    // Check if email is being changed and if new email already exists
+    if (email && email !== user.email) {
+      const emailExists = await User.findOne({ email });
+      if (emailExists) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Email already exists' 
+        });
+      }
+      user.email = email;
+    }
+
+    // Check if phone is being changed and if new phone already exists
+    if (phone && phone !== user.phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Phone number already exists' 
+        });
+      }
+      user.phone = phone;
+    }
+
+    await user.save();
+
+    // Find and update profile
+    let profile = await Profile.findOne({ 
+      user: userId, 
+      $or: [
+        { profileType: 'user' },
+        { profileType: { $exists: false } } 
+      ]
+    });
+
+      // Update profile fields if provided
+      if (state !== undefined) profile.state = state || '';
+      if (dist !== undefined) profile.dist = dist || '';
+      if (dob) profile.dateOfBirth = new Date(dob);
+      
+      // Update name, phone, gmail in profile if changed
+      if (name) profile.name = name;
+      if (phone) profile.phone = phone;
+      if (email) profile.gmail = email;
+
+      await profile.save();
+   
+
+    // Format date to YYYY-MM-DD (remove time)
+    const formatDate = (date) => {
+      if (!date) return '';
+      return date.toISOString().split('T')[0];
+    };
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isProfileComplete: user.isProfileComplete,
+        state: profile.state || '',
+        dist: profile.dist || '',
+        dob: formatDate(profile.dateOfBirth) || '',
+      },
+    });
   } catch (error) {
     res.status(500).json({ 
       success: false, 
