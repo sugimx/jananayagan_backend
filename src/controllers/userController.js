@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 
 // Generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign({ id }, 'e4b2f472aa63e6df8b4c9a7e8c9c44f5a6d2b8cd3a83f1e9f03df7e57a41b8f7', {
     expiresIn: '30d',
   });
 };
@@ -60,6 +60,9 @@ exports.registerUser = async (req, res) => {
           user: user._id,
           profileType: 'user',
           status: 'active',
+          state: '', 
+          dist: '',
+          dateOfBirth: new Date('1990-01-01'), 
         };
 
         // Only set these fields if they have values (to avoid unique constraint issues)
@@ -176,6 +179,32 @@ exports.getUserProfile = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user) {
+      // Fetch user's profile data to get state, district, and DOB
+      const profile = await Profile.findOne({ 
+        user: req.user._id, 
+        $or: [
+          { profileType: 'user' },
+          { profileType: { $exists: false } } 
+        ]
+      });
+
+      // If no profile exists, create one with default values
+      let userProfile = profile;
+      if (!profile) {
+        console.log('No profile found, creating default profile for user:', req.user._id);
+        userProfile = await Profile.create({
+          user: req.user._id,
+          profileType: 'user',
+          status: 'active',
+          state: userProfile?.state||'',
+          dist: userProfile?.dist||'',
+          dob: userProfile?.dateOfBirth||'',
+          name: user.name,
+          phone: user.phone,
+          gmail: user.email,
+        });
+      }
+
       res.json({
         success: true,
         data: {
@@ -185,6 +214,9 @@ exports.getUserProfile = async (req, res) => {
           phone: user.phone,
           role: user.role,
           isProfileComplete: user.isProfileComplete,
+          state: userProfile?.state||'',
+          dist: userProfile?.dist||'',
+          dob: userProfile?.dateOfBirth||'',
         },
       });
     } else {

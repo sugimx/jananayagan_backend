@@ -89,7 +89,26 @@ npm start
 
 ### Request Examples
 
-#### Register User
+### 📦 Order and PhonePe Payment API
+
+### Quick Links
+- **[Complete API Documentation](./ORDER_AND_PAYMENT_API.md)** - Detailed API documentation with sample data
+- **[cURL Examples](./ORDER_API_CURL_EXAMPLES.md)** - Ready-to-use cURL commands
+- **[Usage Guide](./USAGE_GUIDE.md)** - Quick start guide
+- **[Postman Collection](./Order_PhonePe_API.postman_collection.json)** - Import to Postman for testing
+
+### Quick Start
+```bash
+# Run automated test
+node test_order_api.js
+
+# Or use cURL commands from ORDER_API_CURL_EXAMPLES.md
+# Or import Postman collection
+```
+
+---
+
+### Register User
 ```json
 POST /api/users/register
 {

@@ -5,7 +5,7 @@ const axios = require('axios');
 
 // Generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign({ id }, 'e4b2f472aa63e6df8b4c9a7e8c9c44f5a6d2b8cd3a83f1e9f03df7e57a41b8f7', {
     expiresIn: '30d',
   });
 };

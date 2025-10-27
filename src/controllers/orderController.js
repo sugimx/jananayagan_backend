@@ -5,8 +5,8 @@ const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 
 // PhonePe configuration
 const PHONEPE_CONFIG = {
-  merchantId: process.env.PHONEPE_MERCHANT_ID,
-  saltKey: process.env.PHONEPE_SALT_KEY,
+  merchantId: 'TEST-M232K2YCXHM8V_25102',
+  saltKey: 'NTE4ZWE4ODItNTM5OC00MDMxLTgwZmItOGU1MTIzNTM4NjJh',
   saltIndex: process.env.PHONEPE_SALT_INDEX || 1,
   baseUrl: process.env.PHONEPE_BASE_URL || 'https://api-preprod.phonepe.com/apis/pg-sandbox',
 };
@@ -94,14 +94,20 @@ exports.createOrder = async (req, res) => {
     const shippingCharges = totalAmount > 1000 ? 0 : 50; 
     const finalAmount = totalAmount + shippingCharges;
 
+    // Generate order number
+    const timestamp = Date.now().toString();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const orderNumber = `ORD-${timestamp}-${random}`;
+
     // Create order
     const order = await Order.create({
+      orderNumber,
       user: req.user._id,
       items: orderItems,
       shippingAddress: {
         fullName: shippingAddress.fullName,
         phone: shippingAddress.phone,
-        addressLine1: shippingAddress.address,
+        addressLine1: shippingAddress.addressLine1,
         city: shippingAddress.city,
         state: shippingAddress.state,
         postalCode: shippingAddress.postalCode,

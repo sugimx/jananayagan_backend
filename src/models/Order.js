@@ -8,7 +8,6 @@ const orderSchema = new mongoose.Schema({
   },
   orderNumber: {
     type: String,
-    required: true,
     unique: true,
   },
   items: [{
@@ -49,6 +48,10 @@ const orderSchema = new mongoose.Schema({
       required: true,
     },
     addressLine1: {
+      type: String,
+      required: true,
+    },
+    city: {
       type: String,
       required: true,
     },
@@ -122,15 +125,5 @@ orderSchema.index({ user: 1 });
 orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ 'paymentDetails.status': 1 });
 orderSchema.index({ orderStatus: 1 });
-
-// Generate order number before saving
-orderSchema.pre('save', async function(next) {
-  if (this.isNew && !this.orderNumber) {
-    const timestamp = Date.now().toString();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    this.orderNumber = `ORD-${timestamp}-${random}`;
-  }
-  next();
-});
 
 module.exports = mongoose.model('Order', orderSchema);
