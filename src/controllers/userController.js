@@ -205,6 +205,12 @@ exports.getUserProfile = async (req, res) => {
         });
       }
 
+      // Format date to YYYY-MM-DD (remove time)
+      const formatDate = (date) => {
+        if (!date) return '';
+        return date.toISOString().split('T')[0];
+      };
+
       res.json({
         success: true,
         data: {
@@ -216,7 +222,7 @@ exports.getUserProfile = async (req, res) => {
           isProfileComplete: user.isProfileComplete,
           state: userProfile?.state||'',
           dist: userProfile?.dist||'',
-          dob: userProfile?.dateOfBirth||'',
+          dob:  formatDate(userProfile.dateOfBirth),
         },
       });
     } else {
