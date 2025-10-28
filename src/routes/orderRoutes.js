@@ -10,9 +10,9 @@ const {
 } = require('../controllers/orderController');
 const { protect, protectPayment } = require('../middleware/authMiddleware');
 
+router.post('/payment/phonepe/callback', phonePeCallback);
 router.post('/', protectPayment, createOrder);
 router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
-router.post('/payment/phonepe/callback', phonePeCallback);
 router.get('/', protect, getUserOrders);
 router.get('/:id', protect, getOrder);
 router.put('/:id/status', protect, updateOrderStatus);
