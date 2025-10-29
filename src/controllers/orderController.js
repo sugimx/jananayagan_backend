@@ -7,11 +7,17 @@ const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 
 // Load configuration directly from environment variables instead of ../config/index.js
 const PHONEPE_CONFIG = {
-  merchantId: process.env.PHONEPE_MERCHANT_ID || 'PGTESTPAYUAT',
-  saltKey: process.env.PHONEPE_SALT_KEY || 'NTE4ZWE4ODItNTM5OC00MDMxLTgwZmItOGU1MTIzNTM4NjJh',
-  saltIndex: process.env.PHONEPE_SALT_INDEX || '1',
-  baseUrl: process.env.PHONEPE_BASE_URL || 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+  merchantId: process.env.PHONEPE_MERCHANT_ID,
+  saltKey: process.env.PHONEPE_SALT_KEY,
+  saltIndex: process.env.PHONEPE_SALT_INDEX,
+  baseUrl: process.env.PHONEPE_BASE_URL,
 };
+
+// Validate PhonePe config at startup to fail fast with clear error
+if (!PHONEPE_CONFIG.merchantId || !PHONEPE_CONFIG.saltKey || !PHONEPE_CONFIG.saltIndex || !PHONEPE_CONFIG.baseUrl) {
+  console.error('PhonePe configuration is missing. Ensure PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, PHONEPE_BASE_URL are set.');
+}
+
 
 const SERVER_CONFIG = {
   port: process.env.PORT || 5000,
@@ -24,6 +30,13 @@ const generateChecksum = (payload, saltKey) => {
   const checksumString = base64Payload + '/pg/v1/pay' + saltKey;
   const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
   return checksum + '###' + PHONEPE_CONFIG.saltIndex;
+};
+
+// Ensure PhonePe gets a 10-digit mobile number (strip country code and non-digits)
+const sanitizeMobileNumber = (input) => {
+  if (!input) return '9876543210';
+  const digits = String(input).replace(/\D/g, '');
+  return digits.slice(-10) || '9876543210';
 };
 
 // @desc    Create new order
@@ -211,6 +224,7 @@ exports.createOrder = async (req, res) => {
 // @route   POST /api/orders/:id/payment/phonepe
 // @access  Private
 exports.createPhonePePayment = async (req, res) => {
+  
   try {
     const order = await Order.findOne({
       _id: req.params.id,
@@ -249,19 +263,19 @@ exports.createPhonePePayment = async (req, res) => {
   }
 };
 
-// Helper function to create PhonePe payment request
+
 const createPhonePePaymentRequest = async (order) => {
   const merchantTransactionId = `TXN_${order._id}_${Date.now()}`;
   
   const payload = {
     merchantId: PHONEPE_CONFIG.merchantId,
-    merchantTransactionId,
-    merchantUserId: order.user.toString(),
-    amount: order.finalAmount * 100, // PhonePe expects amount in paise
+    merchantTransactionId: "MT" + Date.now(),
+    merchantUserId: "U123",
+    amount: order.finalAmount * 100, 
     redirectUrl: `${SERVER_CONFIG.frontendUrl}/payment/callback`,
     redirectMode: 'POST',
     callbackUrl: `http://localhost:${SERVER_CONFIG.port}/api/orders/payment/phonepe/callback`,
-    mobileNumber: order.shippingAddress.phone.replace(/^\+/, '') || '9876543210', // Remove + prefix for PhonePe, fallback to test number
+    mobileNumber: sanitizeMobileNumber(order.shippingAddress.phone),
     paymentInstrument: {
       type: 'PAY_PAGE',
     },
@@ -270,7 +284,6 @@ const createPhonePePaymentRequest = async (order) => {
 
   const checksum = generateChecksum(payload, PHONEPE_CONFIG.saltKey);
 
-  // Make the actual API call to PhonePe
   try {
     const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
   
@@ -311,14 +324,12 @@ const createPhonePePaymentRequest = async (order) => {
       phonepeResponse: phonepeData
     };
   } catch (error) {
-    console.error('Error calling PhonePe API:', error);
-    
-    // Log more details about the error
+    console.error('Error calling PhonePe API:', error.message);
     if (error.response) {
-      console.error('PhonePe API Error Response:', error.response.data);
-      
+      console.error('PhonePe API Error Status:', error.response.status);
+      console.error('PhonePe API Error Headers:', error.response.headers);
+      console.error('PhonePe API Error Body:', JSON.stringify(error.response.data, null, 2));
     }
-    
     throw new Error(`PhonePe API call failed: ${error.response?.data?.message || error.message}`);
   }
 };

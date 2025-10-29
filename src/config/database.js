@@ -1,12 +1,11 @@
-
-
 const mongoose = require('mongoose');
-
+const indexConfig = require('./index');
 
 const connectDB = async () => {
   try {
+    console.log(indexConfig.MONGO_URI);
     const mongoURI = process.env.MONGODB_URI;
-    const conn = await mongoose.connect('mongodb+srv://sugixinfo_db_user:xQfjSiVESQbX2tQW@cluster0.n2zfxxj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
+    const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
