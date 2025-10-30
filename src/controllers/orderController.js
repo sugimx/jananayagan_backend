@@ -6,16 +6,32 @@ const axios = require('axios');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 
 // Load configuration directly from environment variables instead of ../config/index.js
+// Fix common typo in baseUrl: 'pg-sandboxs' -> 'pg-sandbox'
+let baseUrl = (process.env.PHONEPE_BASE_URL || '').replace(/\/$/, '');
+if (baseUrl.includes('pg-sandboxs')) {
+  console.warn(`Warning: PHONEPE_BASE_URL contains typo 'pg-sandboxs'. Correcting to 'pg-sandbox'. Please update your environment variable.`);
+  baseUrl = baseUrl.replace(/pg-sandboxs/i, 'pg-sandbox');
+}
+
 const PHONEPE_CONFIG = {
   merchantId: process.env.PHONEPE_MERCHANT_ID,
   saltKey: process.env.PHONEPE_SALT_KEY,
   saltIndex: process.env.PHONEPE_SALT_INDEX,
-  baseUrl: process.env.PHONEPE_BASE_URL,
+  baseUrl: baseUrl,
 };
 
 // Validate PhonePe config at startup to fail fast with clear error
 if (!PHONEPE_CONFIG.merchantId || !PHONEPE_CONFIG.saltKey || !PHONEPE_CONFIG.saltIndex || !PHONEPE_CONFIG.baseUrl) {
   console.error('PhonePe configuration is missing. Ensure PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, PHONEPE_BASE_URL are set.');
+}
+
+// Additional validation for empty strings (env vars might be set but empty)
+const missingConfig = [];
+if (!PHONEPE_CONFIG.merchantId || PHONEPE_CONFIG.merchantId.trim() === '') missingConfig.push('PHONEPE_MERCHANT_ID');
+if (!PHONEPE_CONFIG.saltKey || PHONEPE_CONFIG.saltKey.trim() === '') missingConfig.push('PHONEPE_SALT_KEY');
+if (!PHONEPE_CONFIG.saltIndex || PHONEPE_CONFIG.saltIndex.trim() === '') missingConfig.push('PHONEPE_SALT_INDEX');
+if (missingConfig.length > 0) {
+  console.warn(`Warning: PhonePe config has empty values: ${missingConfig.join(', ')}. This may cause authentication errors.`);
 }
 
 
@@ -24,10 +40,13 @@ const SERVER_CONFIG = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 };
 
+// PhonePe endpoint path (used for both URL and checksum)
+const PHONEPE_PAY_ENDPOINT_PATH = '/pg/v1/pay';
+
 // Generate PhonePe checksum
 const generateChecksum = (payload, saltKey) => {
   const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-  const checksumString = base64Payload + '/pg/v1/pay' + saltKey;
+  const checksumString = base64Payload + PHONEPE_PAY_ENDPOINT_PATH + saltKey;
   const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
   return checksum + '###' + PHONEPE_CONFIG.saltIndex;
 };
@@ -265,41 +284,49 @@ exports.createPhonePePayment = async (req, res) => {
 
 
 const createPhonePePaymentRequest = async (order) => {
-  const merchantTransactionId = `TXN_${order._id}_${Date.now()}`;
+  const timestamp = Date.now().toString().slice(-10); // Last 10 digits
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase(); // 6 char random
+  const merchantTransactionId = `TXN_${timestamp}_${random}`; // ~21 chars total
   
   const payload = {
     merchantId: PHONEPE_CONFIG.merchantId,
-    merchantTransactionId: "MT" + Date.now(),
-    merchantUserId: "U123",
-    amount: order.finalAmount * 100, 
+    merchantTransactionId: merchantTransactionId,
+    merchantUserId: order.user._id.toString(),
+    amount: 100, 
     redirectUrl: `${SERVER_CONFIG.frontendUrl}/payment/callback`,
-    redirectMode: 'POST',
     callbackUrl: `http://localhost:${SERVER_CONFIG.port}/api/orders/payment/phonepe/callback`,
     mobileNumber: sanitizeMobileNumber(order.shippingAddress.phone),
     paymentInstrument: {
       type: 'PAY_PAGE',
     },
   };
-
-
-  const checksum = generateChecksum(payload, PHONEPE_CONFIG.saltKey);
+  
+  // Generate base64 payload
+  const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
+  
+  // Generate checksum: base64Payload + endpoint + saltKey
+  const checksumString = base64Payload + PHONEPE_PAY_ENDPOINT_PATH + PHONEPE_CONFIG.saltKey;
+  const sha256Hash = crypto.createHash('sha256').update(checksumString).digest('hex');
+  const xVerifyHeader = sha256Hash + '###' + PHONEPE_CONFIG.saltIndex;
+ 
 
   try {
-    const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-  
-    const phonepeResponse = await axios.post(`${PHONEPE_CONFIG.baseUrl}/pg/v1/pay`, {
+    // Construct the full URL - use /pg/v1/pay for standard API
+    const apiPath = '/pg/v1/pay';
+    const url = `${PHONEPE_CONFIG.baseUrl}${apiPath}`;
+   
+
+    const phonepeResponse = await axios.post(url, {
       request: base64Payload
     }, {
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      'X-VERIFY': checksum,
-      'X-MERCHANT-ID': PHONEPE_CONFIG.merchantId,
+        'X-VERIFY': xVerifyHeader,
       }
     });
 
-    
     const phonepeData = phonepeResponse.data;
+   
    
     // Extract the redirect URL from PhonePe response
     let redirectUrl = null;
@@ -318,9 +345,9 @@ const createPhonePePaymentRequest = async (order) => {
     return {
       merchantTransactionId,
       payload,
-      checksum,
-      url: `${PHONEPE_CONFIG.baseUrl}/pg/v1/pay`,
-      redirectUrl, // This is the URL the user should be redirected to
+      checksum: xVerifyHeader,
+      url,
+      redirectUrl,
       phonepeResponse: phonepeData
     };
   } catch (error) {
@@ -330,10 +357,27 @@ const createPhonePePaymentRequest = async (order) => {
       console.error('PhonePe API Error Headers:', error.response.headers);
       console.error('PhonePe API Error Body:', JSON.stringify(error.response.data, null, 2));
     }
-    throw new Error(`PhonePe API call failed: ${error.response?.data?.message || error.message}`);
+    const apiMsg = error.response?.data?.message || error.response?.data || error.message;
+    const errorCode = error.response?.data?.code;
+    
+    // Handle Authorization header error with detailed guidance
+    if (typeof apiMsg === 'string' && /Auth header.*Authorization.*missing or invalid/i.test(apiMsg)) {
+      console.error(`PhonePe authentication failed. Check server logs for detailed instructions. Verify your Salt Key matches Merchant ID: ${PHONEPE_CONFIG.merchantId}`);
+      throw new Error(`PhonePe authentication failed. Check server logs for detailed instructions. Verify your Salt Key matches Merchant ID: ${PHONEPE_CONFIG.merchantId}`);
+    }
+    
+    // Handle other errors
+    if (/Api Mapping Not Found/i.test(apiMsg)) {
+      throw new Error(`PhonePe API endpoint not found. Using: ${PHONEPE_CONFIG.baseUrl}${PHONEPE_PAY_ENDPOINT_PATH}. Verify PHONEPE_BASE_URL is correct.`);
+    }
+    
+    if (errorCode === 'KEY_NOT_CONFIGURED' || /Key not found for the merchant/i.test(apiMsg)) {
+      throw new Error(`PhonePe Merchant Key not configured. Merchant ID: ${PHONEPE_CONFIG.merchantId}. Please verify credentials in PhonePe Dashboard.`);
+    }
+    
+    throw new Error(`PhonePe API call failed: ${typeof apiMsg === 'string' ? apiMsg : JSON.stringify(apiMsg)}`);
   }
 };
-
 // @desc    PhonePe payment callback
 // @route   POST /api/orders/payment/phonepe/callback
 // @access  Public
