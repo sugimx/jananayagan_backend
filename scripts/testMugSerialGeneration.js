@@ -55,9 +55,7 @@ if (require.main === module) {
   console.log('Make sure to set up your database connection before running.');
   console.log('You can run this test by connecting to your database first.\n');
   
-  // Uncomment the following lines to run the actual test:
-  // mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/your-database');
-  // testMugSerialGeneration().then(() => process.exit(0));
+
 }
 
 module.exports = { testMugSerialGeneration };

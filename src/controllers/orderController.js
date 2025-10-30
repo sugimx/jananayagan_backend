@@ -5,13 +5,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 
-// Load configuration directly from environment variables instead of ../config/index.js
-// Fix common typo in baseUrl: 'pg-sandboxs' -> 'pg-sandbox'
-let baseUrl = (process.env.PHONEPE_BASE_URL || '').replace(/\/$/, '');
-if (baseUrl.includes('pg-sandboxs')) {
-  console.warn(`Warning: PHONEPE_BASE_URL contains typo 'pg-sandboxs'. Correcting to 'pg-sandbox'. Please update your environment variable.`);
-  baseUrl = baseUrl.replace(/pg-sandboxs/i, 'pg-sandbox');
-}
+let baseUrl = process.env.PHONEPE_BASE_URL 
 
 const PHONEPE_CONFIG = {
   merchantId: process.env.PHONEPE_MERCHANT_ID,
@@ -25,7 +19,7 @@ if (!PHONEPE_CONFIG.merchantId || !PHONEPE_CONFIG.saltKey || !PHONEPE_CONFIG.sal
   console.error('PhonePe configuration is missing. Ensure PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, PHONEPE_BASE_URL are set.');
 }
 
-// Additional validation for empty strings (env vars might be set but empty)
+
 const missingConfig = [];
 if (!PHONEPE_CONFIG.merchantId || PHONEPE_CONFIG.merchantId.trim() === '') missingConfig.push('PHONEPE_MERCHANT_ID');
 if (!PHONEPE_CONFIG.saltKey || PHONEPE_CONFIG.saltKey.trim() === '') missingConfig.push('PHONEPE_SALT_KEY');
@@ -36,20 +30,13 @@ if (missingConfig.length > 0) {
 
 
 const SERVER_CONFIG = {
-  port: process.env.PORT || 5000,
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  port: process.env.PORT,
+  frontendUrl: process.env.FRONTEND_URL,
 };
 
 // PhonePe endpoint path (used for both URL and checksum)
 const PHONEPE_PAY_ENDPOINT_PATH = '/pg/v1/pay';
 
-// Generate PhonePe checksum
-const generateChecksum = (payload, saltKey) => {
-  const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-  const checksumString = base64Payload + PHONEPE_PAY_ENDPOINT_PATH + saltKey;
-  const checksum = crypto.createHash('sha256').update(checksumString).digest('hex');
-  return checksum + '###' + PHONEPE_CONFIG.saltIndex;
-};
 
 // Ensure PhonePe gets a 10-digit mobile number (strip country code and non-digits)
 const sanitizeMobileNumber = (input) => {
@@ -165,7 +152,7 @@ exports.createOrder = async (req, res) => {
       orderItems.push(orderItem);
     }
 
-    const shippingCharges = 0; // Free shipping for all orders
+    const shippingCharges = 0;
     const finalAmount = totalAmount + shippingCharges;
 
     // Generate order number
