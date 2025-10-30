@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 
-let baseUrl = process.env.PHONEPE_BASE_URL 
+let baseUrl = process.env.PHONEPE_BASE_URL
 
 const PHONEPE_CONFIG = {
   merchantId: process.env.PHONEPE_MERCHANT_ID,
@@ -50,33 +50,33 @@ const sanitizeMobileNumber = (input) => {
 // @access  Private
 exports.createOrder = async (req, res) => {
   try {
-   
-    
+
+
     // Check if body is empty or undefined
     if (!req.body) {
-     
+
       return res.status(400).json({
         success: false,
         message: 'Request body is empty',
       });
     }
-    
+
     // If body is empty object
     if (Object.keys(req.body).length === 0) {
-    
+
       return res.status(400).json({
         success: false,
         message: 'Request body is empty',
       });
     }
-    
+
     const { items, shippingAddressId, paymentMethod } = req.body;
-    
-   
-    
+
+
+
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
-     
+
       return res.status(400).json({
         success: false,
         message: 'Order items are required',
@@ -88,7 +88,7 @@ exports.createOrder = async (req, res) => {
         }
       });
     }
-  
+
 
     if (!shippingAddressId) {
       return res.status(400).json({
@@ -120,14 +120,14 @@ exports.createOrder = async (req, res) => {
     // Calculate totals and generate mug serials
     let totalAmount = 0;
     const orderItems = [];
-    
-   // console.log('Processing items:', items);
-    
+
+    // console.log('Processing items:', items);
+
     for (const item of items) {
-     
+
       const itemTotal = item.quantity * item.price;
       totalAmount += itemTotal;
-      
+
       const orderItem = {
         productId: item.productId,
         productName: item.productName,
@@ -135,9 +135,9 @@ exports.createOrder = async (req, res) => {
         price: item.price,
         totalPrice: itemTotal,
       };
-      
+
       //console.log('Created orderItem:', orderItem);
-      
+
       // Generate mug serial if this is a mug product and bike number is provided
       if (item.isMug && item.bikeNumber) {
         try {
@@ -148,7 +148,7 @@ exports.createOrder = async (req, res) => {
           // Continue without mug serial if generation fails
         }
       }
-      
+
       orderItems.push(orderItem);
     }
 
@@ -230,7 +230,7 @@ exports.createOrder = async (req, res) => {
 // @route   POST /api/orders/:id/payment/phonepe
 // @access  Private
 exports.createPhonePePayment = async (req, res) => {
-  
+
   try {
     const order = await Order.findOne({
       _id: req.params.id,
@@ -252,7 +252,7 @@ exports.createPhonePePayment = async (req, res) => {
     }
 
     const paymentRequest = await createPhonePePaymentRequest(order);
-    
+
     order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
     await order.save();
 
@@ -274,35 +274,36 @@ const createPhonePePaymentRequest = async (order) => {
   const timestamp = Date.now().toString().slice(-10); // Last 10 digits
   const random = Math.random().toString(36).substring(2, 8).toUpperCase(); // 6 char random
   const merchantTransactionId = `TXN_${timestamp}_${random}`; // ~21 chars total
-  
+  console.log('payload', payload);
   const payload = {
     merchantId: PHONEPE_CONFIG.merchantId,
     merchantTransactionId: merchantTransactionId,
     merchantUserId: order.user._id.toString(),
-    amount: 100, 
-    redirectUrl: `${SERVER_CONFIG.frontendUrl}/payment/callback`,
+    amount: 100,
+    redirectUrl: `${SERVER_CONFIG.frontendUrl}/profile`,
     callbackUrl: `http://localhost:${SERVER_CONFIG.port}/api/orders/payment/phonepe/callback`,
     mobileNumber: sanitizeMobileNumber(order.shippingAddress.phone),
     paymentInstrument: {
       type: 'PAY_PAGE',
     },
   };
-  
+
   // Generate base64 payload
   const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-  
+
   // Generate checksum: base64Payload + endpoint + saltKey
   const checksumString = base64Payload + PHONEPE_PAY_ENDPOINT_PATH + PHONEPE_CONFIG.saltKey;
   const sha256Hash = crypto.createHash('sha256').update(checksumString).digest('hex');
   const xVerifyHeader = sha256Hash + '###' + PHONEPE_CONFIG.saltIndex;
- 
+
 
   try {
-    // Construct the full URL - use /pg/v1/pay for standard API
+
+   
     const apiPath = '/pg/v1/pay';
     const url = `${PHONEPE_CONFIG.baseUrl}${apiPath}`;
-   
 
+    console.log('url', url);
     const phonepeResponse = await axios.post(url, {
       request: base64Payload
     }, {
@@ -313,8 +314,8 @@ const createPhonePePaymentRequest = async (order) => {
     });
 
     const phonepeData = phonepeResponse.data;
-   
-   
+    console.log('phonepeData', phonepeData);
+
     // Extract the redirect URL from PhonePe response
     let redirectUrl = null;
     if (phonepeData.success && phonepeData.data?.instrumentResponse?.redirectInfo?.url) {
@@ -346,22 +347,22 @@ const createPhonePePaymentRequest = async (order) => {
     }
     const apiMsg = error.response?.data?.message || error.response?.data || error.message;
     const errorCode = error.response?.data?.code;
-    
+
     // Handle Authorization header error with detailed guidance
     if (typeof apiMsg === 'string' && /Auth header.*Authorization.*missing or invalid/i.test(apiMsg)) {
       console.error(`PhonePe authentication failed. Check server logs for detailed instructions. Verify your Salt Key matches Merchant ID: ${PHONEPE_CONFIG.merchantId}`);
       throw new Error(`PhonePe authentication failed. Check server logs for detailed instructions. Verify your Salt Key matches Merchant ID: ${PHONEPE_CONFIG.merchantId}`);
     }
-    
+
     // Handle other errors
     if (/Api Mapping Not Found/i.test(apiMsg)) {
       throw new Error(`PhonePe API endpoint not found. Using: ${PHONEPE_CONFIG.baseUrl}${PHONEPE_PAY_ENDPOINT_PATH}. Verify PHONEPE_BASE_URL is correct.`);
     }
-    
+
     if (errorCode === 'KEY_NOT_CONFIGURED' || /Key not found for the merchant/i.test(apiMsg)) {
       throw new Error(`PhonePe Merchant Key not configured. Merchant ID: ${PHONEPE_CONFIG.merchantId}. Please verify credentials in PhonePe Dashboard.`);
     }
-    
+
     throw new Error(`PhonePe API call failed: ${typeof apiMsg === 'string' ? apiMsg : JSON.stringify(apiMsg)}`);
   }
 };
@@ -372,9 +373,9 @@ exports.phonePeCallback = async (req, res) => {
   try {
     const { response } = req.body;
     const decodedResponse = JSON.parse(Buffer.from(response, 'base64').toString());
-    
+
     const { merchantTransactionId, transactionId, state, code, responseCode } = decodedResponse;
-    
+
     if (responseCode === 'PAYMENT_SUCCESS') {
       // Update order payment status
       const order = await Order.findOne({
@@ -407,7 +408,7 @@ exports.phonePeCallback = async (req, res) => {
 exports.getUserOrders = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
-    
+
     const query = { user: req.user._id };
     if (status) {
       query.orderStatus = status;
