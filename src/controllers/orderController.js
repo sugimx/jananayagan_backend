@@ -274,7 +274,7 @@ const createPhonePePaymentRequest = async (order) => {
   const timestamp = Date.now().toString().slice(-10); // Last 10 digits
   const random = Math.random().toString(36).substring(2, 8).toUpperCase(); // 6 char random
   const merchantTransactionId = `TXN_${timestamp}_${random}`; // ~21 chars total
-  console.log('payload', payload);
+ 
   const payload = {
     merchantId: PHONEPE_CONFIG.merchantId,
     merchantTransactionId: merchantTransactionId,
