@@ -74,20 +74,6 @@ exports.registerUser = async (req, res) => {
         const userProfile = await Profile.create(userProfileData);
         console.log('User profile created successfully for user:', user._id);
 
-        // Build buyer profile data (without unique fields to avoid conflicts)
-        const buyerProfileData = {
-          user: user._id,
-          profileType: 'buyer',
-          status: 'active',
-        };
-
-        // Add optional fields only if provided (phone and gmail are unique, so we skip them for buyer profile)
-        if (name) buyerProfileData.name = name;
-
-        // Create buyer profile
-        const buyerProfile = await Profile.create(buyerProfileData);
-        console.log('Buyer profile created successfully for user:', user._id);
-
         // Update user's profile completion status
         await User.findByIdAndUpdate(user._id, { isProfileComplete: true });
       } catch (profileError) {
@@ -106,7 +92,7 @@ exports.registerUser = async (req, res) => {
         
         return res.status(500).json({
           success: false,
-          message: 'Failed to create user profiles. Please try again.',
+          message: 'Failed to create user profile. Please try again.',
           error: profileError.message
         });
       }

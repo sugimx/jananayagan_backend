@@ -52,27 +52,6 @@ exports.googleAuth = async (req, res) => {
         user.googleId = id;
         await user.save();
       }
-
-      // Ensure buyer profile exists for existing users
-      try {
-        const existingBuyerProfile = await Profile.findOne({
-          user: user._id,
-          profileType: 'user',
-        });
-        if (!existingBuyerProfile) {
-          const buyerProfileData = {
-            user: user._id,
-            profileType: 'user',
-            status: 'active',
-          };
-          if (name) buyerProfileData.name = name;
-          await Profile.create(buyerProfileData);
-          console.log('Buyer profile created for existing Google user:', user._id);
-        }
-      } catch (buyerProfileError) {
-        console.error('Error ensuring buyer profile for existing Google user:', buyerProfileError);
-        // Non-fatal: proceed with login even if ensuring buyer profile fails
-      }
     } else {
       // Create new user
       user = await User.create({
@@ -84,11 +63,11 @@ exports.googleAuth = async (req, res) => {
         profilePicture: picture || null,
       });
 
-      // Create default user profile automatically
+      // Create default buyer profile automatically for new users only
       try {
         const profileData = {
           user: user._id,
-          profileType: 'user',
+          profileType: 'buyer',
           status: 'active',
           dateOfBirth: null,
           profileImage: picture || null,
@@ -99,23 +78,13 @@ exports.googleAuth = async (req, res) => {
         if (email) profileData.gmail = email;
 
         await Profile.create(profileData);
-        console.log('User profile created successfully for Google user:', user._id);
-
-        // Also create buyer profile similar to signup flow (avoid unique fields)
-        const buyerProfileData = {
-          user: user._id,
-          profileType: 'buyer',
-          status: 'active',
-        };
-        if (name) buyerProfileData.name = name;
-        await Profile.create(buyerProfileData);
         console.log('Buyer profile created successfully for Google user:', user._id);
 
         // Update user's profile completion status
         user.isProfileComplete = true;
         await user.save();
       } catch (profileError) {
-        console.error('Error creating profile for Google user:', profileError);
+        console.error('Error creating buyer profile for Google user:', profileError);
         console.error('Profile error details:', {
           message: profileError.message,
           code: profileError.code,
@@ -128,7 +97,7 @@ exports.googleAuth = async (req, res) => {
         
         return res.status(500).json({
           success: false,
-          message: 'Failed to create user profile. Please try again.',
+          message: 'Failed to create buyer profile. Please try again.',
           error: profileError.message
         });
       }

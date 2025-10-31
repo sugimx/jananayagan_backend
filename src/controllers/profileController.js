@@ -40,7 +40,7 @@ exports.getUserProfile = async (req, res) => {
 // @access  Private
 exports.updateUserProfile = async (req, res) => {
   try {
-    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+  const { name, fullName, buyerName, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
 
     const profile = await Profile.findOne({ 
       user: req.user._id, 
@@ -59,7 +59,8 @@ exports.updateUserProfile = async (req, res) => {
 
     
     const updateData = {};
-    if (name !== undefined) updateData.name = name;
+    const resolvedName = (name ?? fullName ?? buyerName);
+    if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
     if (phone) updateData.phone = phone;
@@ -103,7 +104,7 @@ exports.createBuyerProfile = async (req, res) => {
     console.log('Request body type:', typeof req.body);
     console.log('Request body keys:', Object.keys(req.body || {}));
     
-    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+  const { name, fullName, buyerName, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
 
     console.log('Destructured values:', {
       name: name,
@@ -228,7 +229,8 @@ exports.updateBuyerProfile = async (req, res) => {
 
     // Update profile fields
     const updateData = {};
-    if (name !== undefined) updateData.name = name;
+    const resolvedName = (name ?? fullName ?? buyerName);
+    if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
     if (phone) updateData.phone = phone;
@@ -364,7 +366,7 @@ exports.getProfile = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+  const { name, fullName, buyerName, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
 
     const profile = await Profile.findOne({ 
       user: req.user._id, 
@@ -383,7 +385,8 @@ exports.updateProfile = async (req, res) => {
 
     // Update profile fields
     const updateData = {};
-    if (name !== undefined) updateData.name = name;
+    const resolvedName = (name ?? fullName ?? buyerName);
+    if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
     if (phone) updateData.phone = phone;
