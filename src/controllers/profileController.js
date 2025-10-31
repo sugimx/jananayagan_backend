@@ -40,7 +40,7 @@ exports.getUserProfile = async (req, res) => {
 // @access  Private
 exports.updateUserProfile = async (req, res) => {
   try {
-  const { _id, name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+  const { _id, name, dateOfBirth, phone, gmail, status, dist, state } = req.body;
 
     if (!_id) {
       return res.status(400).json({
@@ -63,7 +63,6 @@ exports.updateUserProfile = async (req, res) => {
     const resolvedName = (name);
     if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
-    if (profileImage !== undefined) updateData.profileImage = profileImage;
     if (phone) updateData.phone = phone;
     if (gmail) updateData.gmail = gmail;
     if (status) updateData.status = status;
@@ -71,7 +70,7 @@ exports.updateUserProfile = async (req, res) => {
     if (state) updateData.state = state;
     
     
-    updateData.profileType = 'user';
+   
     
     const updatedProfile = await Profile.findByIdAndUpdate(
       _id,
@@ -212,13 +211,13 @@ exports.getBuyerProfiles = async (req, res) => {
 exports.updateBuyerProfile = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+    const { name, dateOfBirth, profileType, phone, gmail, status, dist, state } = req.body;
 
     // Check if buyer profile exists and belongs to user
     const buyerProfile = await Profile.findOne({ 
       _id: id, 
       user: req.user._id, 
-      profileType: 'buyer' 
+      profileType: profileType 
     });
 
     if (!buyerProfile) {
