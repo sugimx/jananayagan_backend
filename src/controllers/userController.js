@@ -195,7 +195,7 @@ exports.getUserProfile = async (req, res) => {
           isProfileComplete: user.isProfileComplete,
           state: userProfile?.state||'',
           dist: userProfile?.dist||'',
-          dob:formatDate(userProfile.dateOfBirth) || '',
+          dob: formatDate(userProfile?.dateOfBirth) || '',
         },
       });
     } else {
