@@ -62,7 +62,7 @@ exports.updateUserProfile = async (req, res) => {
     const updateData = {};
     const resolvedName = (name);
     if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
-    if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+    if (dateOfBirth) updateData.dateOfBirth = new Date(String(dateOfBirth).replace(/\//g, '-'));
     if (phone) updateData.phone = phone;
     if (gmail) updateData.gmail = gmail;
     if (status) updateData.status = status;
@@ -98,11 +98,7 @@ exports.updateUserProfile = async (req, res) => {
 // @access  Private
 exports.createBuyerProfile = async (req, res) => {
   try {
-    console.log('=== CREATE BUYER PROFILE DEBUG ===');
-    console.log('Request headers:', req.headers);
-    console.log('Request body:', req.body);
-    console.log('Request body type:', typeof req.body);
-    console.log('Request body keys:', Object.keys(req.body || {}));
+   
     
   const { name, fullName, buyerName, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
 
@@ -160,7 +156,7 @@ exports.createBuyerProfile = async (req, res) => {
       user: req.user._id,
       profileType: 'buyer',
       name: name.trim() || null,
-      dateOfBirth: dateOfBirth || null,
+      dateOfBirth: dateOfBirth ? new Date(String(dateOfBirth).replace(/\//g, '-')) : null,
       profileImage: profileImage || null,
       phone: phone.trim() || null,
       gmail: gmail.toLowerCase().trim() || null,
@@ -192,15 +188,7 @@ exports.getBuyerProfiles = async (req, res) => {
       user: req.user._id
     }).sort({ createdAt: -1 });
 
-    const formatted = profiles.map((p) => {
-      const obj = p.toObject();
-      if (obj.createdAt) obj.createdAt = new Date(obj.createdAt).toISOString().slice(0, 10);
-      if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt).toISOString().slice(0, 10);
-      if (obj.dateOfBirth) obj.dateOfBirth = new Date(obj.dateOfBirth).toISOString().slice(0, 10);
-      return obj;
-    });
-
-    console.log('Formatted profiles:', formatted);
+    const formatted = profiles.map((p) => p.toObject());
 
     res.json({
       success: true,
@@ -241,7 +229,7 @@ exports.updateBuyerProfile = async (req, res) => {
     const updateData = {};
     const resolvedName = (name ?? fullName ?? buyerName);
     if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
-    if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+    if (dateOfBirth) updateData.dateOfBirth = new Date(String(dateOfBirth).replace(/\//g, '-'));
     if (phone) updateData.phone = phone;
     if (gmail) updateData.gmail = gmail;
     if (status) updateData.status = status;
@@ -396,7 +384,7 @@ exports.updateProfile = async (req, res) => {
     const updateData = {};
     const resolvedName = (name ?? fullName ?? buyerName);
     if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
-    if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+    if (dateOfBirth) updateData.dateOfBirth = new Date(String(dateOfBirth).replace(/\//g, '-'));
     if (profileImage !== undefined) updateData.profileImage = profileImage;
     if (phone) updateData.phone = phone;
     if (gmail) updateData.gmail = gmail;

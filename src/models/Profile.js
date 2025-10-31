@@ -73,20 +73,29 @@ profileSchema.index({ user: 1 });
 
 
 // Ensure consistent date formatting in API responses
+const formatDateYMDWithSlashes = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}/${month}/${day}`;
+};
+
 profileSchema.set('toJSON', {
   transform: (doc, ret) => {
-    if (ret.dateOfBirth) ret.dateOfBirth = new Date(ret.dateOfBirth).toISOString().slice(0, 10);
-    if (ret.createdAt) ret.createdAt = new Date(ret.createdAt).toISOString().slice(0, 10);
-    if (ret.updatedAt) ret.updatedAt = new Date(ret.updatedAt).toISOString().slice(0, 10);
+    if (ret.dateOfBirth) ret.dateOfBirth = formatDateYMDWithSlashes(ret.dateOfBirth);
+    if (ret.createdAt) ret.createdAt = formatDateYMDWithSlashes(ret.createdAt);
+    if (ret.updatedAt) ret.updatedAt = formatDateYMDWithSlashes(ret.updatedAt);
     return ret;
   }
 });
 
 profileSchema.set('toObject', {
   transform: (doc, ret) => {
-    if (ret.dateOfBirth) ret.dateOfBirth = new Date(ret.dateOfBirth).toISOString().slice(0, 10);
-    if (ret.createdAt) ret.createdAt = new Date(ret.createdAt).toISOString().slice(0, 10);
-    if (ret.updatedAt) ret.updatedAt = new Date(ret.updatedAt).toISOString().slice(0, 10);
+    if (ret.dateOfBirth) ret.dateOfBirth = formatDateYMDWithSlashes(ret.dateOfBirth);
+    if (ret.createdAt) ret.createdAt = formatDateYMDWithSlashes(ret.createdAt);
+    if (ret.updatedAt) ret.updatedAt = formatDateYMDWithSlashes(ret.updatedAt);
     return ret;
   }
 });
