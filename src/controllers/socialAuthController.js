@@ -66,7 +66,7 @@ exports.googleAuth = async (req, res) => {
       try {
         const profileData = {
           user: user._id,
-          profileType: 'buyer',
+          profileType: 'user',
           status: 'active',
           dateOfBirth: null,
           profileImage: picture || null,
