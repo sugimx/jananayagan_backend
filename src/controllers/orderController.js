@@ -288,7 +288,7 @@ const createPhonePePaymentRequest = async (order) => {
     },
   };
 
-  // Generate base64 payload
+ 
   const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
 
   // Generate checksum: base64Payload + endpoint + saltKey
