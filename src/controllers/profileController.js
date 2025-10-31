@@ -232,7 +232,6 @@ exports.updateBuyerProfile = async (req, res) => {
     const resolvedName = (name ?? fullName ?? buyerName);
     if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
-    if (profileImage !== undefined) updateData.profileImage = profileImage;
     if (phone) updateData.phone = phone;
     if (gmail) updateData.gmail = gmail;
     if (status) updateData.status = status;
