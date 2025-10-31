@@ -57,12 +57,12 @@ exports.googleAuth = async (req, res) => {
       try {
         const existingBuyerProfile = await Profile.findOne({
           user: user._id,
-          profileType: 'buyer',
+          profileType: 'user',
         });
         if (!existingBuyerProfile) {
           const buyerProfileData = {
             user: user._id,
-            profileType: 'buyer',
+            profileType: 'user',
             status: 'active',
           };
           if (name) buyerProfileData.name = name;
