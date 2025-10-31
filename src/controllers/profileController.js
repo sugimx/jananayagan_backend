@@ -195,6 +195,7 @@ exports.getBuyerProfiles = async (req, res) => {
       const obj = p.toObject();
       if (obj.createdAt) obj.createdAt = new Date(obj.createdAt).toISOString().slice(0, 10);
       if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt).toISOString().slice(0, 10);
+      if (obj.dateOfBirth) obj.dateOfBirth = new Date(obj.dateOfBirth).toISOString().slice(0, 10);
       return obj;
     });
 
