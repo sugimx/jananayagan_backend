@@ -187,15 +187,21 @@ exports.createBuyerProfile = async (req, res) => {
 // @access  Private
 exports.getBuyerProfiles = async (req, res) => {
   try {
-    const buyerProfiles = await Profile.find({ 
-      user: req.user._id, 
-      profileType: 'buyer' 
+    const profiles = await Profile.find({ 
+      user: req.user._id
     }).sort({ createdAt: -1 });
+
+    const formatted = profiles.map((p) => {
+      const obj = p.toObject();
+      if (obj.createdAt) obj.createdAt = new Date(obj.createdAt).toISOString().slice(0, 10);
+      if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt).toISOString().slice(0, 10);
+      return obj;
+    });
 
     res.json({
       success: true,
-      count: buyerProfiles.length,
-      data: buyerProfiles,
+      count: formatted.length,
+      data: formatted,
     });
   } catch (error) {
     res.status(500).json({
