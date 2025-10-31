@@ -72,4 +72,23 @@ profileSchema.index({ user: 1, profileType: 1 }, {
 profileSchema.index({ user: 1 });
 
 
+// Ensure consistent date formatting in API responses
+profileSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    if (ret.dateOfBirth) ret.dateOfBirth = new Date(ret.dateOfBirth).toISOString().slice(0, 10);
+    if (ret.createdAt) ret.createdAt = new Date(ret.createdAt).toISOString().slice(0, 10);
+    if (ret.updatedAt) ret.updatedAt = new Date(ret.updatedAt).toISOString().slice(0, 10);
+    return ret;
+  }
+});
+
+profileSchema.set('toObject', {
+  transform: (doc, ret) => {
+    if (ret.dateOfBirth) ret.dateOfBirth = new Date(ret.dateOfBirth).toISOString().slice(0, 10);
+    if (ret.createdAt) ret.createdAt = new Date(ret.createdAt).toISOString().slice(0, 10);
+    if (ret.updatedAt) ret.updatedAt = new Date(ret.updatedAt).toISOString().slice(0, 10);
+    return ret;
+  }
+});
+
 module.exports = mongoose.model('Profile', profileSchema);

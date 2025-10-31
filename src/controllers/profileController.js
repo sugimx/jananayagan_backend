@@ -187,6 +187,7 @@ exports.createBuyerProfile = async (req, res) => {
 // @access  Private
 exports.getBuyerProfiles = async (req, res) => {
   try {
+
     const profiles = await Profile.find({ 
       user: req.user._id
     }).sort({ createdAt: -1 });
@@ -198,6 +199,8 @@ exports.getBuyerProfiles = async (req, res) => {
       if (obj.dateOfBirth) obj.dateOfBirth = new Date(obj.dateOfBirth).toISOString().slice(0, 10);
       return obj;
     });
+
+    console.log('Formatted profiles:', formatted);
 
     res.json({
       success: true,

@@ -272,7 +272,7 @@ exports.createPhonePePayment = async (req, res) => {
 
 const createPhonePePaymentRequest = async (order) => {
   const timestamp = Date.now().toString().slice(-10); // Last 10 digits
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase(); // 6 char random
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase(); 
   const merchantTransactionId = `TXN_${timestamp}_${random}`; // ~21 chars total
  
   const payload = {
