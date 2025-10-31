@@ -62,28 +62,43 @@ exports.googleAuth = async (req, res) => {
         profilePicture: picture || null,
       });
 
-      // Ensure a single 'user' profile exists (do not auto-create buyer profile)
+      // Create default buyer profile automatically for new users only
       try {
-        const profileDefaults = {
+        const profileData = {
           user: user._id,
-          profileType: 'user',
+          profileType: 'buyer',
           status: 'active',
           dateOfBirth: null,
           profileImage: picture || null,
         };
 
-        if (name) profileDefaults.name = name;
-        if (email) profileDefaults.gmail = email;
+        // Only set these fields if they have values
+        if (name) profileData.name = name;
+        if (email) profileData.gmail = email;
 
-        await Profile.findOneAndUpdate(
-          { user: user._id, profileType: 'user' },
-          { $setOnInsert: profileDefaults },
-          { upsert: true, new: true }
-        );
-        console.log('User profile ensured for Google user:', user._id);
+        await Profile.create(profileData);
+        console.log('Buyer profile created successfully for Google user:', user._id);
+
+        // Update user's profile completion status
+        user.isProfileComplete = true;
+        await user.save();
       } catch (profileError) {
-        console.error('Error ensuring user profile for Google user:', profileError);
-        // Do not block login; user can complete profile later
+        console.error('Error creating buyer profile for Google user:', profileError);
+        console.error('Profile error details:', {
+          message: profileError.message,
+          code: profileError.code,
+          keyPattern: profileError.keyPattern,
+          keyValue: profileError.keyValue
+        });
+        
+        // Delete the user if profile creation fails
+        await User.findByIdAndDelete(user._id);
+        
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create buyer profile. Please try again.',
+          error: profileError.message
+        });
       }
     }
 
