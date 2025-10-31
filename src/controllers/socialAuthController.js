@@ -58,48 +58,33 @@ exports.googleAuth = async (req, res) => {
         name,
         email,
         googleId: id,
-        isProfileComplete: false, // User needs to complete profile
-        password: '', // No password for social auth users
+        isProfileComplete: false,
+        password: '',
         profilePicture: picture || null,
       });
 
-      // Create default buyer profile automatically for new users only
+      // Ensure a single 'user' profile exists (do not auto-create buyer profile)
       try {
-        const profileData = {
+        const profileDefaults = {
           user: user._id,
-          profileType: 'buyer',
+          profileType: 'user',
           status: 'active',
           dateOfBirth: null,
           profileImage: picture || null,
         };
 
-        // Only set these fields if they have values
-        if (name) profileData.name = name;
-        if (email) profileData.gmail = email;
+        if (name) profileDefaults.name = name;
+        if (email) profileDefaults.gmail = email;
 
-        await Profile.create(profileData);
-        console.log('Buyer profile created successfully for Google user:', user._id);
-
-        // Update user's profile completion status
-        user.isProfileComplete = true;
-        await user.save();
+        await Profile.findOneAndUpdate(
+          { user: user._id, profileType: 'user' },
+          { $setOnInsert: profileDefaults },
+          { upsert: true, new: true }
+        );
+        console.log('User profile ensured for Google user:', user._id);
       } catch (profileError) {
-        console.error('Error creating buyer profile for Google user:', profileError);
-        console.error('Profile error details:', {
-          message: profileError.message,
-          code: profileError.code,
-          keyPattern: profileError.keyPattern,
-          keyValue: profileError.keyValue
-        });
-        
-        // Delete the user if profile creation fails
-        await User.findByIdAndDelete(user._id);
-        
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to create buyer profile. Please try again.',
-          error: profileError.message
-        });
+        console.error('Error ensuring user profile for Google user:', profileError);
+        // Do not block login; user can complete profile later
       }
     }
 
