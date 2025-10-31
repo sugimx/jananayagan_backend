@@ -23,9 +23,15 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: false,
-    minlength: 6,
     select: false,
-    default: '',
+    validate: {
+      validator: function(value) {
+        // If password is provided, it must be at least 6 characters
+        // If undefined, null, or empty string, that's fine for social auth users
+        return value === undefined || value === null || value === '' || value.length >= 6;
+      },
+      message: 'Password must be at least 6 characters'
+    }
   },
   role: {
     type: String,
@@ -58,14 +64,18 @@ const userSchema = new mongoose.Schema({
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password') || !this.password) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Compare password method
 userSchema.methods.comparePassword = async function(enteredPassword) {
+  if (!this.password) {
+    return false; // Social auth users don't have passwords
+  }
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

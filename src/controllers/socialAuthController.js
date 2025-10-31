@@ -59,7 +59,6 @@ exports.googleAuth = async (req, res) => {
         email,
         googleId: id,
         isProfileComplete: false,
-        password: '',
         profilePicture: picture || null,
       });
 
