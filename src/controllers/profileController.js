@@ -40,15 +40,16 @@ exports.getUserProfile = async (req, res) => {
 // @access  Private
 exports.updateUserProfile = async (req, res) => {
   try {
-  const { name, fullName, buyerName, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
+  const { _id, name, dateOfBirth, profileImage, phone, gmail, status, dist, state } = req.body;
 
-    const profile = await Profile.findOne({ 
-      user: req.user._id, 
-      $or: [
-        { profileType: 'user' },
-        { profileType: { $exists: false } } 
-      ]
-    });
+    if (!_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'profileId is required',
+      });
+    }
+
+    const profile = await Profile.findById(_id);
 
     if (!profile) {
       return res.status(404).json({
@@ -59,7 +60,7 @@ exports.updateUserProfile = async (req, res) => {
 
     
     const updateData = {};
-    const resolvedName = (name ?? fullName ?? buyerName);
+    const resolvedName = (name);
     if (resolvedName !== undefined) updateData.name = typeof resolvedName === 'string' ? resolvedName.trim() : resolvedName;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
@@ -73,7 +74,7 @@ exports.updateUserProfile = async (req, res) => {
     updateData.profileType = 'user';
     
     const updatedProfile = await Profile.findByIdAndUpdate(
-      profile._id,
+      _id,
       updateData,
       { new: true, runValidators: true }
     );
