@@ -91,19 +91,23 @@ npm start
 
 ### 📦 Order and PhonePe Payment API
 
+**✅ Now using PhonePe V2 APIs** - Migration complete!
+
 ### Quick Links
+- **[Quick Start Guide](./QUICK_START_V2.md)** - Get started with V2 in minutes
+- **[V2 Migration Guide](./PHONEPE_V2_MIGRATION.md)** - Detailed migration documentation
 - **[Complete API Documentation](./ORDER_AND_PAYMENT_API.md)** - Detailed API documentation with sample data
 - **[cURL Examples](./ORDER_API_CURL_EXAMPLES.md)** - Ready-to-use cURL commands
-- **[Usage Guide](./USAGE_GUIDE.md)** - Quick start guide
 - **[Postman Collection](./Order_PhonePe_API.postman_collection.json)** - Import to Postman for testing
 
 ### Quick Start
 ```bash
-# Run automated test
-node test_order_api.js
+# Update environment variables (see env.example)
+cp env.example .env
 
-# Or use cURL commands from ORDER_API_CURL_EXAMPLES.md
-# Or import Postman collection
+# Configure PhonePe V2 credentials in .env
+# Then restart server
+npm run dev
 ```
 
 ---

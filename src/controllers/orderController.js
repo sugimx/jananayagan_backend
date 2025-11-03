@@ -1,49 +1,26 @@
 require('dotenv').config();
 const Order = require('../models/Order');
 const Address = require('../models/Address');
-const crypto = require('crypto');
-const axios = require('axios');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
+const { 
+  createPaymentRequest, 
+  validateConfig
+} = require('../utils/phonepeV2Helper');
 
-let baseUrl = process.env.PHONEPE_BASE_URL
-
-const PHONEPE_CONFIG = {
-  merchantId: process.env.PHONEPE_MERCHANT_ID,
-  saltKey: process.env.PHONEPE_SALT_KEY,
-  saltIndex: process.env.PHONEPE_SALT_INDEX,
-  baseUrl: baseUrl,
-};
-
-// Validate PhonePe config at startup to fail fast with clear error
-if (!PHONEPE_CONFIG.merchantId || !PHONEPE_CONFIG.saltKey || !PHONEPE_CONFIG.saltIndex || !PHONEPE_CONFIG.baseUrl) {
-  console.error('PhonePe configuration is missing. Ensure PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, PHONEPE_BASE_URL are set.');
-}
-
-
-const missingConfig = [];
-if (!PHONEPE_CONFIG.merchantId || PHONEPE_CONFIG.merchantId.trim() === '') missingConfig.push('PHONEPE_MERCHANT_ID');
-if (!PHONEPE_CONFIG.saltKey || PHONEPE_CONFIG.saltKey.trim() === '') missingConfig.push('PHONEPE_SALT_KEY');
-if (!PHONEPE_CONFIG.saltIndex || PHONEPE_CONFIG.saltIndex.trim() === '') missingConfig.push('PHONEPE_SALT_INDEX');
-if (missingConfig.length > 0) {
-  console.warn(`Warning: PhonePe config has empty values: ${missingConfig.join(', ')}. This may cause authentication errors.`);
-}
-
+const validatePhonePeConfig = validateConfig;
 
 const SERVER_CONFIG = {
   port: process.env.PORT,
   frontendUrl: process.env.FRONTEND_URL,
 };
 
-// PhonePe endpoint path (used for both URL and checksum)
-const PHONEPE_PAY_ENDPOINT_PATH = '/pg/v1/pay';
-
-
-// Ensure PhonePe gets a 10-digit mobile number (strip country code and non-digits)
-const sanitizeMobileNumber = (input) => {
-  if (!input) return '9876543210';
-  const digits = String(input).replace(/\D/g, '');
-  return digits.slice(-10) || '9876543210';
-};
+// Validate PhonePe V2 config at startup to fail fast with clear error
+try {
+  validatePhonePeConfig();
+  console.log('PhonePe V2 configuration validated successfully');
+} catch (error) {
+  console.error('PhonePe V2 configuration error:', error.message);
+}
 
 // @desc    Create new order
 // @route   POST /api/orders
@@ -199,7 +176,7 @@ exports.createOrder = async (req, res) => {
 
     // If payment method is PhonePe, create payment request
     if (paymentMethod === 'phonepe') {
-      const paymentRequest = await createPhonePePaymentRequest(order);
+      const paymentRequest = await createPhonePeV2PaymentRequest(order);
       order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
       await order.save();
 
@@ -230,7 +207,6 @@ exports.createOrder = async (req, res) => {
 // @route   POST /api/orders/:id/payment/phonepe
 // @access  Private
 exports.createPhonePePayment = async (req, res) => {
-
   try {
     const order = await Order.findOne({
       _id: req.params.id,
@@ -251,7 +227,7 @@ exports.createPhonePePayment = async (req, res) => {
       });
     }
 
-    const paymentRequest = await createPhonePePaymentRequest(order);
+    const paymentRequest = await createPhonePeV2PaymentRequest(order);
 
     order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
     await order.save();
@@ -269,114 +245,64 @@ exports.createPhonePePayment = async (req, res) => {
   }
 };
 
+/**
+ * Create PhonePe V2 payment request
+ * @param {Object} order - Order object
+ * @returns {Promise<Object>} Payment request details
+ */
+const createPhonePeV2PaymentRequest = async (order) => {
+  // Generate unique transaction ID
+  const timestamp = Date.now().toString().slice(-10);
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const merchantTransactionId = `TXN_${timestamp}_${random}`;
 
-const createPhonePePaymentRequest = async (order) => {
-  const timestamp = Date.now().toString().slice(-10); // Last 10 digits
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase(); 
-  const merchantTransactionId = `TXN_${timestamp}_${random}`; // ~21 chars total
- 
-  const payload = {
-    merchantId: PHONEPE_CONFIG.merchantId,
-    merchantTransactionId: merchantTransactionId,
-    merchantUserId: order.user._id.toString(),
-    amount: 100,
+  const paymentData = {
+    merchantTransactionId,
+    userId: order.user.toString(),
+    amount: order.finalAmount * 100, // Convert to paise
     redirectUrl: `${SERVER_CONFIG.frontendUrl}/profile`,
-    callbackUrl: `http://localhost:${SERVER_CONFIG.port}/api/orders/payment/phonepe/callback`,
-    mobileNumber: sanitizeMobileNumber(order.shippingAddress.phone),
-    paymentInstrument: {
-      type: 'PAY_PAGE',
-    },
+    callbackUrl: `${SERVER_CONFIG.frontendUrl}/api/orders/payment/phonepe/callback`,
+    mobileNumber: order.shippingAddress.phone,
   };
 
- 
-  const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
+  console.log('Creating PhonePe V2 payment request for order:', order.orderNumber);
 
-  // Generate checksum: base64Payload + endpoint + saltKey
-  const checksumString = base64Payload + PHONEPE_PAY_ENDPOINT_PATH + PHONEPE_CONFIG.saltKey;
-  const sha256Hash = crypto.createHash('sha256').update(checksumString).digest('hex');
-  const xVerifyHeader = sha256Hash + '###' + PHONEPE_CONFIG.saltIndex;
+  const result = await createPaymentRequest(paymentData);
 
-
-  try {
-
-   
-    const apiPath = '/pg/v1/pay';
-    const url = `${PHONEPE_CONFIG.baseUrl}${apiPath}`;
-
-    console.log('url', url);
-    const phonepeResponse = await axios.post(url, {
-      request: base64Payload
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-VERIFY': xVerifyHeader,
-      }
-    });
-
-    const phonepeData = phonepeResponse.data;
-    console.log('phonepeData', phonepeData);
-
-    // Extract the redirect URL from PhonePe response
-    let redirectUrl = null;
-    if (phonepeData.success && phonepeData.data?.instrumentResponse?.redirectInfo?.url) {
-      redirectUrl = phonepeData.data.instrumentResponse.redirectInfo.url;
-    } else if (phonepeData.data?.redirectUrl) {
-      redirectUrl = phonepeData.data.redirectUrl;
-    } else if (phonepeData.url) {
-      redirectUrl = phonepeData.url;
-    }
-
-    if (!redirectUrl) {
-      throw new Error(`PhonePe payment failed: ${phonepeData.message || 'No redirect URL received'}`);
-    }
-
-    return {
-      merchantTransactionId,
-      payload,
-      checksum: xVerifyHeader,
-      url,
-      redirectUrl,
-      phonepeResponse: phonepeData
-    };
-  } catch (error) {
-    console.error('Error calling PhonePe API:', error.message);
-    if (error.response) {
-      console.error('PhonePe API Error Status:', error.response.status);
-      console.error('PhonePe API Error Headers:', error.response.headers);
-      console.error('PhonePe API Error Body:', JSON.stringify(error.response.data, null, 2));
-    }
-    const apiMsg = error.response?.data?.message || error.response?.data || error.message;
-    const errorCode = error.response?.data?.code;
-
-    // Handle Authorization header error with detailed guidance
-    if (typeof apiMsg === 'string' && /Auth header.*Authorization.*missing or invalid/i.test(apiMsg)) {
-      console.error(`PhonePe authentication failed. Check server logs for detailed instructions. Verify your Salt Key matches Merchant ID: ${PHONEPE_CONFIG.merchantId}`);
-      throw new Error(`PhonePe authentication failed. Check server logs for detailed instructions. Verify your Salt Key matches Merchant ID: ${PHONEPE_CONFIG.merchantId}`);
-    }
-
-    // Handle other errors
-    if (/Api Mapping Not Found/i.test(apiMsg)) {
-      throw new Error(`PhonePe API endpoint not found. Using: ${PHONEPE_CONFIG.baseUrl}${PHONEPE_PAY_ENDPOINT_PATH}. Verify PHONEPE_BASE_URL is correct.`);
-    }
-
-    if (errorCode === 'KEY_NOT_CONFIGURED' || /Key not found for the merchant/i.test(apiMsg)) {
-      throw new Error(`PhonePe Merchant Key not configured. Merchant ID: ${PHONEPE_CONFIG.merchantId}. Please verify credentials in PhonePe Dashboard.`);
-    }
-
-    throw new Error(`PhonePe API call failed: ${typeof apiMsg === 'string' ? apiMsg : JSON.stringify(apiMsg)}`);
-  }
+  return {
+    merchantTransactionId,
+    redirectUrl: result.redirectUrl,
+    paymentRequest: result,
+  };
 };
 // @desc    PhonePe payment callback
 // @route   POST /api/orders/payment/phonepe/callback
 // @access  Public
 exports.phonePeCallback = async (req, res) => {
   try {
-    const { response } = req.body;
-    const decodedResponse = JSON.parse(Buffer.from(response, 'base64').toString());
+    console.log('PhonePe V2 callback received:', req.body);
 
-    const { merchantTransactionId, transactionId, state, code, responseCode } = decodedResponse;
+    // PhonePe V2 sends response in a slightly different format
+    let decodedResponse;
+    if (req.body.response) {
+      // If response is base64 encoded
+      decodedResponse = JSON.parse(Buffer.from(req.body.response, 'base64').toString());
+    } else {
+      // Direct response object
+      decodedResponse = req.body;
+    }
 
-    if (responseCode === 'PAYMENT_SUCCESS') {
+    const { merchantTransactionId, transactionId, code, responseCode } = decodedResponse;
+
+    console.log('Decoded callback data:', {
+      merchantTransactionId,
+      transactionId,
+      code,
+      responseCode,
+    });
+
+    // PhonePe V2 uses code 'PAYMENT_SUCCESS' or 'PAYMENT_PENDING' for successful payment
+    if (code === 'PAYMENT_SUCCESS' || responseCode === 'PAYMENT_SUCCESS') {
       // Update order payment status
       const order = await Order.findOne({
         'paymentDetails.phonepeTransactionId': merchantTransactionId,
@@ -387,7 +313,12 @@ exports.phonePeCallback = async (req, res) => {
         order.paymentDetails.transactionId = transactionId;
         order.orderStatus = 'confirmed';
         await order.save();
+        console.log(`Order ${order.orderNumber} payment completed successfully`);
+      } else {
+        console.warn(`Order not found for transaction: ${merchantTransactionId}`);
       }
+    } else if (code === 'PAYMENT_ERROR') {
+      console.error('Payment failed for transaction:', merchantTransactionId);
     }
 
     res.json({
@@ -395,6 +326,7 @@ exports.phonePeCallback = async (req, res) => {
       message: 'Payment callback processed',
     });
   } catch (error) {
+    console.error('Error processing PhonePe V2 callback:', error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -428,6 +360,103 @@ exports.getUserOrders = async (req, res) => {
       currentPage: parseInt(page),
       totalPages: Math.ceil(total / limit),
       data: orders,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get user orders summary (product name, price, delivery details, email)
+// @route   GET /api/orders/summary
+// @access  Private
+exports.getUserOrdersSummary = async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    const query = { user: req.user._id };
+    if (status) {
+      query.orderStatus = status;
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+
+    const email = req.user?.email || null;
+
+    const data = orders.map(order => ({
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      items: order.items.map(item => ({
+        productName: item.productName,
+        price: item.price,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+      })),
+      deliveryDetails: {
+        fullName: order.shippingAddress?.fullName,
+        phone: order.shippingAddress?.phone,
+        addressLine1: order.shippingAddress?.addressLine1,
+        city: order.shippingAddress?.city,
+        state: order.shippingAddress?.state,
+        postalCode: order.shippingAddress?.postalCode,
+        country: order.shippingAddress?.country,
+        landmark: order.shippingAddress?.landmark || null,
+        instructions: order.shippingAddress?.instructions || null,
+      },
+      email,
+      paymentStatus: order.paymentDetails?.status,
+      orderStatus: order.orderStatus,
+      createdAt: order.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get orders by status (booking id, payment time, buyer name, amount)
+// @route   GET /api/orders/status/:status/summary
+// @access  Private
+exports.getOrdersByStatusSummary = async (req, res) => {
+  try {
+    const status = req.params.status;
+
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status',
+      });
+    }
+
+    const query = { user: req.user._id };
+    if (status) {
+      query.orderStatus = status;
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+
+    const data = orders.map(order => ({
+      bookingId: order.orderNumber,
+      paymentTime: order.paymentDetails?.status === 'completed' ? order.updatedAt : null,
+      buyerName: order.shippingAddress?.fullName || null,
+      amount: order.finalAmount,
+    }));
+
+    res.json({
+      success: true,
+      count: data.length,
+      data,
     });
   } catch (error) {
     res.status(500).json({
@@ -504,6 +533,89 @@ exports.updateOrderStatus = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get invoice details for an order
+// @route   GET /api/orders/:id/invoice
+// @access  Private
+exports.getOrderInvoice = async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    const discountAmount = 0; // No discount field in model, defaulting to 0
+    const isPaid = order.paymentDetails?.status === 'completed';
+
+    const fromAddress = {
+      name: process.env.INVOICE_FROM_NAME || 'Jana Nayagan',
+      addressLine1: process.env.INVOICE_FROM_ADDRESS_LINE1 || 'Chennai, Tamil Nadu',
+      city: process.env.INVOICE_FROM_CITY || 'Chennai',
+      state: process.env.INVOICE_FROM_STATE || 'TN',
+      postalCode: process.env.INVOICE_FROM_POSTAL || '600001',
+      country: process.env.INVOICE_FROM_COUNTRY || 'India',
+      phone: process.env.INVOICE_FROM_PHONE || '',
+      email: process.env.INVOICE_FROM_EMAIL || '',
+      gstin: process.env.INVOICE_FROM_GSTIN || '',
+    };
+
+    const items = order.items.map((item) => ({
+      description: item.productName,
+      quantity: item.quantity,
+      price: item.price,
+      amount: item.totalPrice,
+    }));
+
+    const invoice = {
+      invoiceId: order.orderNumber,
+      invoiceDate: order.createdAt,
+      billedTo: {
+        name: order.shippingAddress?.fullName,
+        phone: order.shippingAddress?.phone,
+        addressLine1: order.shippingAddress?.addressLine1,
+        city: order.shippingAddress?.city,
+        state: order.shippingAddress?.state,
+        postalCode: order.shippingAddress?.postalCode,
+        country: order.shippingAddress?.country,
+        landmark: order.shippingAddress?.landmark || undefined,
+      },
+      from: fromAddress,
+      items,
+      totals: {
+        subtotal: order.totalAmount,
+        shipping: order.shippingCharges || 0,
+        discount: discountAmount,
+        total: order.finalAmount - discountAmount,
+        amountDue: isPaid ? 0 : (order.finalAmount - discountAmount),
+        currency: order.paymentDetails?.currency || 'INR',
+      },
+      payment: {
+        method: order.paymentDetails?.method,
+        status: order.paymentDetails?.status,
+        transactionId: order.paymentDetails?.transactionId,
+        phonepeTransactionId: order.paymentDetails?.phonepeTransactionId,
+        paidAt: isPaid ? order.updatedAt : null,
+      },
+    };
+
+    return res.json({
+      success: true,
+      data: invoice,
+    });
+  } catch (error) {
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
