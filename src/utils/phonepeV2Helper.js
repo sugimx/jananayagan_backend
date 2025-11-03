@@ -12,12 +12,20 @@ const PHONEPE_V2_CONFIG = {
     clientId: process.env.PHONEPE_CLIENT_ID,
     clientSecret: process.env.PHONEPE_CLIENT_SECRET,
     clientVersion: process.env.PHONEPE_CLIENT_VERSION,
-    baseUrl: process.env.PHONEPE_BASE_URL
+    baseUrl: process.env.PHONEPE_BASE_URL,
+    oauthScope: process.env.PHONEPE_OAUTH_SCOPE,
 };
 
 // Token cache to avoid unnecessary API calls
 let accessTokenCache = null;
 let tokenExpiryTime = null;
+
+// Generate an idempotent request id
+const generateRequestId = (seed) => {
+    const base = seed || `REQ_${Date.now()}`;
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `${base}_${rand}`;
+};
 
 /**
  * Validate PhonePe V2 configuration
@@ -53,15 +61,6 @@ const fetchAccessToken = async () => {
     try {
         validateConfig();
 
-        // Debug: Log configuration (sanitized)
-        console.log('PhonePe V2 Config:', {
-            merchantId: PHONEPE_V2_CONFIG.merchantId ? '***set***' : 'MISSING',
-            clientId: PHONEPE_V2_CONFIG.clientId ? '***set***' : 'MISSING',
-            clientSecret: PHONEPE_V2_CONFIG.clientSecret ? '***set***' : 'MISSING',
-            clientVersion: PHONEPE_V2_CONFIG.clientVersion || 'MISSING',
-            baseUrl: PHONEPE_V2_CONFIG.baseUrl || 'MISSING'
-        });
-
         const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/identity-manager/v1/oauth/token`;
 
         // PhonePe V2 expects credentials in Basic Auth header
@@ -75,20 +74,10 @@ const fetchAccessToken = async () => {
         params.append('grant_type', 'client_credentials');
         params.append('client_id', PHONEPE_V2_CONFIG.clientId);
         params.append('client_secret', PHONEPE_V2_CONFIG.clientSecret);
+        if (PHONEPE_V2_CONFIG.oauthScope) {
+            params.append('scope', PHONEPE_V2_CONFIG.oauthScope);
+        }
 
-        // Log sanitized token request params and headers
-        console.log('PhonePe V2 token request:', {
-            url: tokenUrl,
-            body: {
-                grant_type: "client_credentials",
-                client_id: '***set***',
-                client_secret: '***set***'
-            },
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic ***redacted***',
-            }
-        });
 
         const response = await axios.post(
             tokenUrl,
@@ -100,7 +89,7 @@ const fetchAccessToken = async () => {
                 },
             }
         );
-
+       
         if (!response.data || !response.data.access_token) {
             throw new Error('Invalid token response from PhonePe');
         }
@@ -111,8 +100,6 @@ const fetchAccessToken = async () => {
         const safetyBuffer = 5 * 60 * 1000; // 5 minutes in milliseconds
         accessTokenCache = access_token;
         tokenExpiryTime = Date.now() + (expires_in * 1000) - safetyBuffer;
-
-        console.log('PhonePe V2 access token fetched successfully');
         return access_token;
     } catch (error) {
         console.error('Error fetching PhonePe V2 access token:', error.message);
@@ -187,42 +174,35 @@ const createPaymentRequest = async (paymentData) => {
                 type: 'PAY_PAGE',
             },
         };
-
         const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/pay`;
-
-        console.log('Creating PhonePe V2 payment request:', {
-            url: paymentUrl,
-            merchantTransactionId: paymentData.merchantTransactionId,
-        });
-
-        // PhonePe V2 uses OAuth Bearer token authentication (not checksum/Salt Key)
-        // Get OAuth access token
         const accessToken = await getAccessToken();
-
-        // Build headers for V2 API (JSON body)
-        // PhonePe V2 requires: Authorization Bearer token, X-CLIENT-ID, X-CLIENT-VERSION
+       
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
-            'X-CLIENT-ID': 'SU2510231530375754659666',
-            'X-REQUEST-ID': 'TXN_2157204999_VWBEKA',
-            'X-CLIENT-VERSION': '1.0'
+            'X-CLIENT-ID': PHONEPE_V2_CONFIG.clientId,
+            'X-REQUEST-ID': generateRequestId(paymentData.merchantTransactionId),
         };
-        // Include client version only if explicitly configured for your merchant
+
+        console.log("accessToken", accessToken);
+        console.log("payload", payload);
+        console.log("headers", headers);
+
+        if (PHONEPE_V2_CONFIG.merchantId) {
+            headers['X-MERCHANT-ID'] = PHONEPE_V2_CONFIG.merchantId;
+        }
         if (PHONEPE_V2_CONFIG.clientVersion) {
             headers['X-CLIENT-VERSION'] = PHONEPE_V2_CONFIG.clientVersion;
         }
-
-        const sanitizedHeaders = { ...headers, Authorization: 'Bearer ***redacted***' };
-        console.log('PhonePe V2 payment payload (json):', JSON.stringify(payload));
-        console.log('PhonePe V2 payment headers:', sanitizedHeaders);
 
         const response = await axios.post(
             paymentUrl,
             payload,
             { headers }
         );
+
+        console.log("response", response.data);
 
         if (!response.data || response.data.code !== 'PAYMENT_INITIATED') {
             console.error('PhonePe V2 Payment API Response:', JSON.stringify(response.data, null, 2));
@@ -235,9 +215,6 @@ const createPaymentRequest = async (paymentData) => {
         if (!redirectUrl) {
             throw new Error('No redirect URL received from PhonePe V2');
         }
-
-        console.log('PhonePe V2 payment created successfully');
-
         return {
             success: true,
             merchantTransactionId: paymentData.merchantTransactionId,
@@ -333,10 +310,12 @@ const processRefund = async (refundData) => {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
-            'X-CLIENT-ID': 'SU2510231530375754659666',  
-            'X-REQUEST-ID': 'TXN_2157204999_VWBEKA',
-            'X-CLIENT-VERSION': '1.0'
+            'X-CLIENT-ID': PHONEPE_V2_CONFIG.clientId,
+            'X-REQUEST-ID': generateRequestId(refundData.merchantRefundId),
         };
+        if (PHONEPE_V2_CONFIG.merchantId) {
+            refundHeaders['X-MERCHANT-ID'] = PHONEPE_V2_CONFIG.merchantId;
+        }
         if (PHONEPE_V2_CONFIG.clientVersion) {
             refundHeaders['X-CLIENT-VERSION'] = PHONEPE_V2_CONFIG.clientVersion;
         }

@@ -19,6 +19,7 @@ router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
 router.get('/', protect, getUserOrders);
 router.get('/summary', protect, getUserOrdersSummary);
 router.get('/status/:status/summary', protect, getOrdersByStatusSummary);
+router.get('/invoice/:id', protect, getOrderInvoice);
 router.get('/:id/invoice', protect, getOrderInvoice);
 router.get('/:id', protect, getOrder);
 router.put('/:id/status', protect, updateOrderStatus);
