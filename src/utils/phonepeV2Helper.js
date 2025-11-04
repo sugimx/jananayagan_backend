@@ -11,7 +11,7 @@ const PHONEPE_V2_CONFIG = {
     merchantId: process.env.PHONEPE_MERCHANT_ID,
     clientId: process.env.PHONEPE_CLIENT_ID,
     clientSecret: process.env.PHONEPE_CLIENT_SECRET,
-    clientVersion: process.env.PHONEPE_CLIENT_VERSION,
+    clientVersion: process.env.PHONEPE_CLIENT_VERSION || '1',
     baseUrl: process.env.PHONEPE_BASE_URL,
     oauthScope: process.env.PHONEPE_OAUTH_SCOPE,
 };
@@ -53,7 +53,7 @@ const validateConfig = () => {
 };
 
 /**
- * Fetch OAuth access token from PhonePe
+ * Fetch OAuth access token from PhonePe (Updated with correct endpoint)
  * @returns {Promise<string>} Access token
  * @throws {Error} If token fetch fails
  */
@@ -61,29 +61,25 @@ const fetchAccessToken = async () => {
     try {
         validateConfig();
 
-        const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/identity-manager/v1/oauth/token`;
-
-        // PhonePe V2 expects credentials in Basic Auth header
-        const credentials = Buffer.from(
-            `${PHONEPE_V2_CONFIG.clientId}:${PHONEPE_V2_CONFIG.clientSecret}`
-        ).toString('base64');
-
-        const params = new URLSearchParams();
-        params.append('grant_type', 'client_credentials');
-        params.append('client_id', PHONEPE_V2_CONFIG.clientId);
-        params.append('client_secret', PHONEPE_V2_CONFIG.clientSecret);
-        if (PHONEPE_V2_CONFIG.oauthScope) {
-            params.append('scope', PHONEPE_V2_CONFIG.oauthScope);
-        }
-
+        // Updated: Use the pg-sandbox endpoint path from your snippet
+        const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/v1/oauth/token`;
+         console.log(tokenUrl)
+        const requestBodyJson = {
+            "client_version": PHONEPE_V2_CONFIG.clientVersion,
+            "grant_type": "client_credentials",
+            "client_id": PHONEPE_V2_CONFIG.clientId,
+            "client_secret":PHONEPE_V2_CONFIG.clientSecret
+          
+        };
+        
+        const requestBody = new URLSearchParams(requestBodyJson).toString();
 
         const response = await axios.post(
             tokenUrl,
-            params.toString(),
+            requestBody,
             {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': `Basic ${credentials}`,
                 },
             }
         );
@@ -94,9 +90,12 @@ const fetchAccessToken = async () => {
 
         const { access_token, expires_in } = response.data;
 
+        // Cache token with 5 minute safety buffer
         const safetyBuffer = 5 * 60 * 1000;
         accessTokenCache = access_token;
         tokenExpiryTime = Date.now() + (expires_in * 1000) - safetyBuffer;
+        
+        console.log('PhonePe access token fetched successfully');
         return access_token;
     } catch (error) {
         console.error('Error fetching PhonePe V2 access token:', error.message);
@@ -109,8 +108,8 @@ const fetchAccessToken = async () => {
                 console.error('- 400 Bad Request usually means INVALID credentials or WRONG environment');
                 console.error('- Verify credentials in PhonePe Business Dashboard match your environment');
                 console.error('- Production credentials should use: https://api.phonepe.com');
+                console.error('- Sandbox credentials should use: https://api-preprod.phonepe.com');
                 console.error('- Regenerate credentials if they were recently created/changed');
-                console.error('- Check baseUrl in .env file matches your credentials environment');
             }
         }
         throw new Error(`Failed to fetch PhonePe V2 access token: ${error.message}`);
@@ -123,6 +122,7 @@ const fetchAccessToken = async () => {
  */
 const getAccessToken = async () => {
     if (accessTokenCache && tokenExpiryTime && Date.now() < tokenExpiryTime) {
+        console.log('Using cached access token');
         return accessTokenCache;
     }
 
@@ -141,72 +141,80 @@ const sanitizeMobileNumber = (input) => {
 };
 
 /**
- * Create payment request using PhonePe Checkout V2 API
+ * Create payment request using PhonePe Checkout V2 API (Updated with correct structure)
  * @param {Object} paymentData - Payment request data
- * @param {string} paymentData.merchantTransactionId - Unique transaction ID
- * @param {string} paymentData.userId - User ID
  * @param {number} paymentData.amount - Amount in paise
+ * @param {number} [paymentData.expireAfter] - Expiry time in seconds (default: 1200)
+ * @param {Object} [paymentData.metaInfo] - Additional metadata (udf1-udf15)
  * @param {string} paymentData.redirectUrl - Frontend redirect URL
- * @param {string} paymentData.callbackUrl - Backend callback URL
- * @param {string} paymentData.mobileNumber - Customer mobile number
+ * @param {string} [paymentData.message] - Payment message for collect requests
  * @returns {Promise<Object>} Payment response with redirect URL
  */
 const createPaymentRequest = async (paymentData) => {
     try {
         validateConfig();
 
-        const payload = {
-            merchantId: process.env.PHONEPE_MERCHANT_ID,
-            merchantTransactionId: paymentData.merchantTransactionId,
-            merchantUserId: paymentData.userId,
-            amount: paymentData.amount,
-            redirectUrl: paymentData.redirectUrl,
-            callbackUrl: paymentData.callbackUrl,
-            mobileNumber: sanitizeMobileNumber(paymentData.mobileNumber),
-            redirectMode: 'REDIRECT',
-            paymentInstrument: {
-                type: 'PAY_PAGE',
-            },
-        };
-        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/pay`;
         const accessToken = await getAccessToken();
-       
-        const headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'X-CLIENT-ID': PHONEPE_V2_CONFIG.clientId,
-            'X-REQUEST-ID': generateRequestId(paymentData.merchantTransactionId),
+
+        // Updated: Use the correct payload structure from your snippet
+        const requestBody = {
+            "amount": paymentData.amount,
+            "expireAfter": paymentData.expireAfter || 1200,
+            "metaInfo": paymentData.metaInfo || {
+                "udf1": "additional-information-1",
+                "udf2": "additional-information-2",
+                "udf3": "additional-information-3",
+                "udf4": "additional-information-4",
+                "udf5": "additional-information-5",
+                "udf6": "additional-information-6",
+                "udf7": "additional-information-7",
+                "udf8": "additional-information-8",
+                "udf9": "additional-information-9",
+                "udf10": "additional-information-10",
+                "udf11": "additional-information-11",
+                "udf12": "additional-information-12",
+                "udf13": "additional-information-13",
+                "udf14": "additional-information-14",
+                "udf15": "additional-information-15"
+            },
+            "paymentFlow": {
+                "type": "PG_CHECKOUT",
+                "message": paymentData.message || "Payment message used for collect requests",
+                "merchantUrls": {
+                    "redirectUrl": paymentData.redirectUrl || ""
+                }
+            },
+            "merchantOrderId":paymentData.merchantTransactionId
         };
 
-        console.log("accessToken", accessToken);
-        console.log("payload", payload);
-        console.log("headers", headers);
+        // Updated: Use the pg-sandbox endpoint path
+        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/checkout/v2/pay`;
 
+        // Updated: Use O-Bearer authorization format from your snippet
+        const requestHeaders = {
+            'Content-Type': 'application/json',
+            'Authorization': `O-Bearer ${accessToken}`,
+        };
+
+        console.log('Creating PhonePe payment with payload:', JSON.stringify(requestBody, null, 2));
 
         const response = await axios.post(
             paymentUrl,
-            payload,
-            { headers }
+            requestBody,
+            { headers: requestHeaders }
         );
 
-        console.log("response", response.data);
+        console.log('PhonePe payment response:', JSON.stringify(response.data, null, 2));
 
-        if (!response.data || response.data.code !== 'PAYMENT_INITIATED') {
+        if (!response.data || !response.data.success) {
             console.error('PhonePe V2 Payment API Response:', JSON.stringify(response.data, null, 2));
             throw new Error(
                 `PhonePe V2 payment failed: ${response.data?.message || 'Unknown error'}`
             );
         }
 
-        const redirectUrl = response.data?.data?.redirectUrl;
-        if (!redirectUrl) {
-            throw new Error('No redirect URL received from PhonePe V2');
-        }
         return {
             success: true,
-            merchantTransactionId: paymentData.merchantTransactionId,
-            redirectUrl,
             response: response.data,
         };
     } catch (error) {
@@ -233,18 +241,14 @@ const checkPaymentStatus = async (merchantTransactionId) => {
 
         const accessToken = await getAccessToken();
 
-        const statusUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/order/${merchantTransactionId}/status`;
+        const statusUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/checkout/v2/order/${merchantTransactionId}/status`;
 
         console.log('Checking PhonePe V2 payment status:', merchantTransactionId);
 
         const statusHeaders = {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'X-CLIENT-ID': PHONEPE_V2_CONFIG.clientId,
+            'Authorization': `O-Bearer ${accessToken}`,
         };
-        if (PHONEPE_V2_CONFIG.clientVersion) {
-            statusHeaders['X-CLIENT-VERSION'] = PHONEPE_V2_CONFIG.clientVersion;
-        }
 
         const response = await axios.get(statusUrl, { headers: statusHeaders });
 
@@ -274,7 +278,7 @@ const processRefund = async (refundData) => {
 
         const accessToken = await getAccessToken();
 
-        const refundUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/payments/v2/refund`;
+        const refundUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/payments/v2/refund`;
 
         const payload = {
             merchantId: PHONEPE_V2_CONFIG.merchantId,
@@ -286,31 +290,15 @@ const processRefund = async (refundData) => {
 
         console.log('Processing PhonePe V2 refund:', refundData.merchantRefundId);
 
-        // Encode refund body as URL-encoded
-        const refundParams = new URLSearchParams();
-        refundParams.append('merchantId', payload.merchantId);
-        refundParams.append('originalTransactionId', payload.originalTransactionId);
-        refundParams.append('merchantRefundId', payload.merchantRefundId);
-        refundParams.append('amount', String(payload.amount));
-        if (payload.callbackUrl) refundParams.append('callbackUrl', payload.callbackUrl);
-
         const refundHeaders = {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'X-CLIENT-ID': PHONEPE_V2_CONFIG.clientId,
-            'X-REQUEST-ID': generateRequestId(refundData.merchantRefundId),
+            'Authorization': `O-Bearer ${accessToken}`,
         };
-        if (PHONEPE_V2_CONFIG.merchantId) {
-            refundHeaders['X-MERCHANT-ID'] = PHONEPE_V2_CONFIG.merchantId;
-        }
-        if (PHONEPE_V2_CONFIG.clientVersion) {
-            refundHeaders['X-CLIENT-VERSION'] = PHONEPE_V2_CONFIG.clientVersion;
-        }
 
         const response = await axios.post(
             refundUrl,
-            refundParams.toString(),
+            payload,
             { headers: refundHeaders }
         );
 
@@ -346,4 +334,3 @@ module.exports = {
     clearTokenCache,
     PHONEPE_V2_CONFIG,
 };
-
