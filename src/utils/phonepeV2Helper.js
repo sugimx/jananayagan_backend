@@ -62,7 +62,7 @@ const fetchAccessToken = async () => {
         validateConfig();
 
         // Updated: Use the pg-sandbox endpoint path from your snippet
-        const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/v1/oauth/token`;
+        const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/identity-manager/v1/oauth/token`;
          console.log(tokenUrl)
         const requestBodyJson = {
             "client_version": PHONEPE_V2_CONFIG.clientVersion,
@@ -188,7 +188,7 @@ const createPaymentRequest = async (paymentData) => {
         };
 
         // Updated: Use the pg-sandbox endpoint path
-        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/checkout/v2/pay`;
+        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/pay`;
 
         // Updated: Use O-Bearer authorization format from your snippet
         const requestHeaders = {
