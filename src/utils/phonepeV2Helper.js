@@ -205,24 +205,61 @@ const createPaymentRequest = async (paymentData) => {
         );
 
         console.log('PhonePe payment response:', JSON.stringify(response.data, null, 2));
+        console.log('Response status:', response.status);
+        console.log('Response data type:', typeof response.data);
+        console.log('Response data keys:', response.data ? Object.keys(response.data) : 'null');
+        
+        // PhonePe V2 API returns data directly, not wrapped in success field
+        // Extract redirectUrl from response
+        const responseData = response.data;
+        const redirectUrl = responseData?.redirectUrl;
+        
+        console.log('redirectUrl exists?', redirectUrl ? 'YES' : 'NO');
+        console.log('redirectUrl value:', redirectUrl);
+        console.log('redirectUrl type:', typeof redirectUrl);
 
-        if (!response.data || !response.data.success) {
-            console.error('PhonePe V2 Payment API Response:', JSON.stringify(response.data, null, 2));
+        // Check if we have a valid redirectUrl
+        if (!redirectUrl || (typeof redirectUrl === 'string' && redirectUrl.trim() === '')) {
+            console.error('PhonePe V2 Payment API Response (no redirectUrl):', JSON.stringify(responseData, null, 2));
             throw new Error(
-                `PhonePe V2 payment failed: ${response.data?.message || 'Unknown error'}`
+                `PhonePe V2 payment failed: ${responseData?.message || 'No redirect URL received'}`
             );
         }
 
+        // Return the redirectUrl for frontend redirection
         return {
             success: true,
-            response: response.data,
+            redirectUrl: redirectUrl,
+            orderId: responseData.orderId,
+            state: responseData.state,
+            expireAt: responseData.expireAt,
+            response: responseData,
         };
     } catch (error) {
-        console.error('Error creating PhonePe V2 payment:', error.message);
-        if (error.response) {
+        // Check if error has response data (axios error with response)
+        // Sometimes PhonePe returns valid data even with non-2xx status codes
+        if (error.response && error.response.data) {
+            const responseData = error.response.data;
+            console.log('Error response received, checking for redirectUrl:', JSON.stringify(responseData, null, 2));
+            
+            // If we have redirectUrl in error response, treat it as success
+            if (responseData.redirectUrl) {
+                console.log('Found redirectUrl in error response, treating as success');
+                return {
+                    success: true,
+                    redirectUrl: responseData.redirectUrl,
+                    orderId: responseData.orderId,
+                    state: responseData.state,
+                    expireAt: responseData.expireAt,
+                    response: responseData,
+                };
+            }
+            
             console.error('Payment API Error Status:', error.response.status);
             console.error('Payment API Error Headers:', error.response.headers);
-            console.error('Payment API Error Body:', JSON.stringify(error.response.data, null, 2));
+            console.error('Payment API Error Body:', JSON.stringify(responseData, null, 2));
+        } else {
+            console.error('Error creating PhonePe V2 payment:', error.message);
         }
 
         const apiMsg = error.response?.data?.message || error.message;
