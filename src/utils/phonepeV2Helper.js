@@ -68,8 +68,6 @@ const fetchAccessToken = async () => {
             `${PHONEPE_V2_CONFIG.clientId}:${PHONEPE_V2_CONFIG.clientSecret}`
         ).toString('base64');
 
-        // PhonePe V2 OAuth token endpoint requires form-urlencoded format
-        // PhonePe V2 requires client_id and client_secret in body
         const params = new URLSearchParams();
         params.append('grant_type', 'client_credentials');
         params.append('client_id', PHONEPE_V2_CONFIG.clientId);
@@ -96,8 +94,7 @@ const fetchAccessToken = async () => {
 
         const { access_token, expires_in } = response.data;
 
-        // Cache token with 5 minutes safety buffer before expiry
-        const safetyBuffer = 5 * 60 * 1000; // 5 minutes in milliseconds
+        const safetyBuffer = 5 * 60 * 1000;
         accessTokenCache = access_token;
         tokenExpiryTime = Date.now() + (expires_in * 1000) - safetyBuffer;
         return access_token;
@@ -107,7 +104,6 @@ const fetchAccessToken = async () => {
             console.error('Token API Error Status:', error.response.status);
             console.error('Token API Error Body:', JSON.stringify(error.response.data, null, 2));
 
-            // Provide helpful error context for 400 errors
             if (error.response.status === 400) {
                 console.error('PhonePe V2 Token Request Troubleshooting:');
                 console.error('- 400 Bad Request usually means INVALID credentials or WRONG environment');
@@ -126,12 +122,10 @@ const fetchAccessToken = async () => {
  * @returns {Promise<string>} Valid access token
  */
 const getAccessToken = async () => {
-    // Return cached token if it exists and hasn't expired
     if (accessTokenCache && tokenExpiryTime && Date.now() < tokenExpiryTime) {
         return accessTokenCache;
     }
 
-    // Fetch new token
     return await fetchAccessToken();
 };
 
@@ -189,12 +183,6 @@ const createPaymentRequest = async (paymentData) => {
         console.log("payload", payload);
         console.log("headers", headers);
 
-        if (PHONEPE_V2_CONFIG.merchantId) {
-            headers['X-MERCHANT-ID'] = PHONEPE_V2_CONFIG.merchantId;
-        }
-        if (PHONEPE_V2_CONFIG.clientVersion) {
-            headers['X-CLIENT-VERSION'] = PHONEPE_V2_CONFIG.clientVersion;
-        }
 
         const response = await axios.post(
             paymentUrl,

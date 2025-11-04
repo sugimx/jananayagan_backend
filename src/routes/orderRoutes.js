@@ -7,6 +7,7 @@ const {
   getUserOrders,
   getUserOrdersSummary,
   getOrdersByStatusSummary,
+  getOrderStatusByOrderId,
   getOrder,
   updateOrderStatus,
   getOrderInvoice,
@@ -18,7 +19,7 @@ router.post('/', protectPayment, createOrder);
 router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
 router.get('/', protect, getUserOrders);
 router.get('/summary', protect, getUserOrdersSummary);
-router.get('/status/:status/summary', protect, getOrdersByStatusSummary);
+router.get('/status/:orderId/summary', protect, getOrderStatusByOrderId);
 router.get('/invoice/:id', protect, getOrderInvoice);
 router.get('/:id/invoice', protect, getOrderInvoice);
 router.get('/:id', protect, getOrder);

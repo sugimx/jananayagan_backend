@@ -466,6 +466,75 @@ exports.getOrdersByStatusSummary = async (req, res) => {
   }
 };
 
+// @desc    Get order status summary by orderId
+// @route   GET /api/orders/status/:orderId/summary
+// @access  Private
+exports.getOrderStatusByOrderId = async (req, res) => {
+  try {
+    const param = req.params.orderId || req.params.status;
+    
+    // Check if param is a valid status - if so, it should use the status route
+    // But since this route comes first, we check and handle orderId here
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+    
+    // If it's a valid status, this route shouldn't handle it - let it fall through
+    // Actually, since this route is checked first, we need to distinguish
+    // Check if it looks like an orderId (24 hex characters) vs a status (word)
+    const isValidStatus = validStatuses.includes(param);
+    
+    if (isValidStatus) {
+      // If it's a status, delegate to the status handler
+      req.params.status = param;
+      return exports.getOrdersByStatusSummary(req, res);
+    }
+
+    // Check if orderId is a valid MongoDB ObjectId format (24 hex characters)
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(param);
+    
+    if (!isValidObjectId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format',
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: param,
+      user: req.user._id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    const data = {
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      orderStatus: order.orderStatus,
+      paymentStatus: order.paymentDetails?.status || 'pending',
+      bookingId: order.orderNumber,
+      paymentTime: order.paymentDetails?.status === 'completed' ? order.updatedAt : null,
+      buyerName: order.shippingAddress?.fullName || null,
+      amount: order.finalAmount,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+    };
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // @desc    Get single order
 // @route   GET /api/orders/:id
 // @access  Private
