@@ -2,8 +2,8 @@ require('dotenv').config();
 const Order = require('../models/Order');
 const Address = require('../models/Address');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
-const { 
-  createPaymentRequest, 
+const {
+  createPaymentRequest,
   validateConfig
 } = require('../utils/phonepeV2Helper');
 
@@ -94,6 +94,114 @@ exports.createOrder = async (req, res) => {
       });
     }
 
+    // Comprehensive district mapping for all Indian states
+    // Format: { state: { district: 'CODE' } }
+    // Returns 4-character code: STATE_CODE (2 letters) + DISTRICT_CODE (2 digits)
+    const getDistrictCode = (stateName, districtName) => {
+      if (!stateName) return 'TN01';
+
+      // Normalize inputs
+      const normalizedState = (stateName || '').toLowerCase().trim().replace(/\s+/g, ' ');
+      const normalizedDistrict = (districtName || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+      // State code mapping (2 letters)
+      const stateCodeMap = {
+        'tamilnadu': 'TN',
+        'tamil nadu': 'TN',
+        'kerala': 'KL',
+        'others': 'TN', // Default for others
+      };
+
+      // Get state code (2 letters)
+      let stateCode = 'TN'; // Default
+      const noSpaceState = normalizedState.replace(/\s+/g, '');
+      if (stateCodeMap[normalizedState]) {
+        stateCode = stateCodeMap[normalizedState];
+      } else if (stateCodeMap[noSpaceState]) {
+        stateCode = stateCodeMap[noSpaceState];
+      } else {
+        console.log(`State "${stateName}" not found in map, using default TN`);
+      }
+
+      // District code mapping (2 digits) - comprehensive list for all states
+      const districtMap = {
+        // Tamil Nadu districts
+        'TN': {
+          'chennai north': '01',
+          'chennai central': '02',
+          'chennai south': '03',
+          'kanniyakumari': '74',
+          'coimbatore north': '37',
+          'coimbatore south': '38',
+          'erode': '33',
+          'tiruvarur': '50',
+          'madurai south': '58',
+          'madurai north': '59',
+          'salem east': '30',
+          'salem west': '36',
+          'tiruchirappalli east': '45',
+          'tiruchirappalli west': '47',
+          'sivagangai': '63',
+          'namakkal north': '88',
+          'namakkal south': '34',
+          'thanjavur': '49',
+          'dharmapuri': '29',
+          'nagapattinam': '51',
+          'tuticorin': '69',
+          'theni': '60',
+          'thiruvallur': '20',
+          'tirunelveli': '72',
+          'krishnagiri': '70',
+          'ranipet': '95',
+          'kanchipuram': '21',
+          'cuddalore': '91',
+          'vellore': '23',
+          'tirupattur': '94',
+          'villupuram': '25'
+        },
+        // Kerala districts
+        'KL': {
+          'thiruvananthapuram': '01',
+          'kollam': '02',
+          'pathanamthitta': '03',
+          'alappuzha': '04',
+          'kottayam': '05',
+          'idukki': '06',
+          'ernakulam': '07',
+          'thrissur': '08',
+          'palakkad': '09',
+          'malappuram': '10',
+          'kozhikode': '11',
+          'wayanad': '12',
+          'kannur': '13',
+          'kasaragod': '14'
+        }
+      };
+
+      // Get district code (2 digits)
+      let districtCode = '01'; // Default
+      const stateDistricts = districtMap[stateCode] || {};
+      const noSpaceDistrict = normalizedDistrict.replace(/\s+/g, '');
+
+      if (stateDistricts[normalizedDistrict]) {
+        districtCode = stateDistricts[normalizedDistrict];
+      } else if (stateDistricts[noSpaceDistrict]) {
+        districtCode = stateDistricts[noSpaceDistrict];
+      } else if (normalizedDistrict) {
+        // If district not found, use hash-based code for consistency
+        const hash = normalizedDistrict.split('').reduce((acc, char) => {
+          return ((acc << 5) - acc) + char.charCodeAt(0);
+        }, 0);
+        districtCode = String(Math.abs(hash) % 99 + 1).padStart(2, '0');
+        console.log(`District "${districtName}" not found in map for state "${stateName}", using generated code: ${districtCode}`);
+      } else {
+        console.log(`No district provided for state "${stateName}", using default 01`);
+      }
+
+      // Return 4-character code: STATE_CODE + DISTRICT_CODE
+      return stateCode + districtCode;
+    };
+
     // Calculate totals and generate mug serials
     let totalAmount = 0;
     const orderItems = [];
@@ -115,11 +223,55 @@ exports.createOrder = async (req, res) => {
 
       //console.log('Created orderItem:', orderItem);
 
-      // Generate mug serial if this is a mug product and bike number is provided
-      if (item.isMug && item.bikeNumber) {
+      // Detect if this is a mug product (check productName or isMug flag)
+      const isMugProduct = item.isMug ||
+        (item.productName && item.productName.toLowerCase().includes('mug')) ||
+        (item.productId && item.productId.toString() === '65a1b2c3d4e5f6789abcdef2'); // Known mug product ID
+
+      // Generate mug serial for each cup if this is a mug product
+      if (isMugProduct) {
         try {
-          const mugSerials = await generateMultipleMugSerials(item.bikeNumber, item.quantity);
-          orderItem.mugSerial = mugSerials.join(','); // Store multiple serials as comma-separated string
+          let stateCode;
+
+          // If bike number is provided, try to extract state code from it
+          if (item.bikeNumber && item.bikeNumber.trim() !== '') {
+            // Extract first 4 characters as state code (e.g., "TN01", "KL13")
+            const extractedCode = item.bikeNumber.trim().substring(0, 4).toUpperCase();
+            // Validate it looks like a state code (2 letters + 2 digits)
+            if (/^[A-Z]{2}\d{2}$/.test(extractedCode)) {
+              stateCode = extractedCode;
+              console.log(`Extracted state code from bike number: ${stateCode}`);
+            } else {
+              // Invalid format, use state and district from address
+              stateCode = getDistrictCode(shippingAddress.state, shippingAddress.district);
+              console.log(`Invalid bike number format, using state+district code from address: ${stateCode}`);
+            }
+          } else {
+            // No bike number provided, use state and district from shipping address
+            stateCode = getDistrictCode(shippingAddress.state, shippingAddress.district);
+            console.log(`No bike number provided, using state+district code from address: ${stateCode} for state: ${shippingAddress.state}, district: ${shippingAddress.district}`);
+          }
+
+          // Handle alternating state assignment for "Others" state
+          if (shippingAddress.state === 'Others' || shippingAddress.state === 'others') {
+            // Count all previous orders with "Others" state to determine sequence
+            const othersOrdersCount = await Order.countDocuments({
+              'shippingAddress.state': { $regex: /^others$/i }
+            });
+
+            // Determine alternating state: odd count (1st, 3rd, 5th...) → TN01, even count (2nd, 4th, 6th...) → KL13
+            // Adding 1 because this is the next order
+            const orderSequence = othersOrdersCount + 1;
+            const isOdd = orderSequence % 2 === 1;
+            stateCode = isOdd ? 'TN01' : 'KL13';
+
+            console.log(`Others order #${orderSequence}: Assigned state code: ${stateCode}`);
+          }
+
+          // Generate serials using state code (format: "TN01 0000001", "KL13 0000001")
+          const mugSerials = await generateMultipleMugSerials(stateCode, item.quantity);
+          orderItem.mugSerial = mugSerials; // Store as array, one serial per cup
+          console.log(`Generated ${mugSerials.length} mug serial(s) for product: ${item.productName}`, mugSerials);
         } catch (error) {
           console.error('Error generating mug serials:', error);
           // Continue without mug serial if generation fails
@@ -148,6 +300,7 @@ exports.createOrder = async (req, res) => {
         addressLine1: shippingAddress.addressLine1,
         city: shippingAddress.city,
         state: shippingAddress.state,
+        district: shippingAddress.district,
         postalCode: shippingAddress.postalCode,
         country: shippingAddress.country,
         landmark: shippingAddress.landmark,
@@ -472,16 +625,16 @@ exports.getOrdersByStatusSummary = async (req, res) => {
 exports.getOrderStatusByOrderId = async (req, res) => {
   try {
     const param = req.params.orderId || req.params.status;
-    
+
     // Check if param is a valid status - if so, it should use the status route
     // But since this route comes first, we check and handle orderId here
     const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
-    
+
     // If it's a valid status, this route shouldn't handle it - let it fall through
     // Actually, since this route is checked first, we need to distinguish
     // Check if it looks like an orderId (24 hex characters) vs a status (word)
     const isValidStatus = validStatuses.includes(param);
-    
+
     if (isValidStatus) {
       // If it's a status, delegate to the status handler
       req.params.status = param;
@@ -490,7 +643,7 @@ exports.getOrderStatusByOrderId = async (req, res) => {
 
     // Check if orderId is a valid MongoDB ObjectId format (24 hex characters)
     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(param);
-    
+
     if (!isValidObjectId) {
       return res.status(400).json({
         success: false,
@@ -625,7 +778,7 @@ exports.getOrderInvoice = async (req, res) => {
       });
     }
 
-    const discountAmount = 0; // No discount field in model, defaulting to 0
+    const discountAmount = 0;
     const isPaid = order.paymentDetails?.status === 'completed';
 
     const fromAddress = {

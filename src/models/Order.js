@@ -34,7 +34,7 @@ const orderSchema = new mongoose.Schema({
       required: true,
     },
     mugSerial: {
-      type: String,
+      type: [String], // Array of serial numbers, one for each cup
       required: false, // Only for mug products
     },
   }],
@@ -58,6 +58,10 @@ const orderSchema = new mongoose.Schema({
     state: {
       type: String,
       required: true,
+    },
+    district: {
+      type: String,
+      required: false,
     },
     postalCode: {
       type: String,
