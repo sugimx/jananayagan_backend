@@ -146,7 +146,8 @@ const generateMultipleMugSerials = async (stateCode, quantity) => {
   // Format: STATE_CODE SPACE 7_DIGIT_NUMBER (e.g., "TN01 0000001")
   for (let i = 0; i < quantity; i++) {
     const serialNumber = startSerial + i;
-    const generatedSerial = `${normalizedStateCode} ${String(serialNumber).padStart(7, '0')}`;
+    // const generatedSerial = `${normalizedStateCode} ${String(serialNumber).padStart(7, '0')}`;
+    const generatedSerial = `${String(serialNumber).padStart(8, '0')}`;
     serials.push(generatedSerial);
     console.log(`[MugSerialGenerator] Generated serial ${i + 1}/${quantity}: ${generatedSerial}`);
   }
