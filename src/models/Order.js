@@ -10,6 +10,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     unique: true,
   },
+  buyerProfiles: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Profile',
+    required: true,
+  }],
   items: [{
     productId: {
       type: mongoose.Schema.Types.ObjectId,

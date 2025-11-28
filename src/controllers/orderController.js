@@ -1,6 +1,7 @@
 require('dotenv').config();
 const Order = require('../models/Order');
 const Address = require('../models/Address');
+const MugAssignment = require('../models/Mug');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 const {
   createPaymentRequest,
@@ -22,13 +23,52 @@ try {
   console.error('PhonePe V2 configuration error:', error.message);
 }
 
+
+const createMugAssignmentsForOrder = async (order) => {
+
+  try {
+    if (!order || order.buyerProfiles.length === 0) {
+      console.log('Order has no associated profile; skipping mug assignment creation');
+      return;
+    }
+
+    const existingAssignment = await MugAssignment.findOne({ order: order._id });
+    if (existingAssignment) {
+      console.log(`Mug assignments already exist for order ${order.orderNumber}, skipping`);
+      return;
+    }
+
+    // STEP 1: find last mugId in DB
+    const lastMug = await MugAssignment.findOne().sort({ mugId: -1 });
+    let nextId = lastMug ? lastMug.mugId + 1 : 1;
+
+    const docs = [];
+
+    // STEP 2: For each buyer profile → create a new incremental mugId
+    for (const profile of order.buyerProfiles) {
+      if (!profile?._id) continue;
+
+      docs.push({
+        profile: profile._id,
+        order: order._id,
+        user: order.user,
+        mugId: nextId,
+      });
+
+      nextId++; 
+    }
+
+    await MugAssignment.insertMany(docs, { ordered: false });
+    console.log(`Created ${docs.length} mug assignment(s) for order ${order.orderNumber}`);
+  } catch (error) {
+    console.error(`Failed to create mug assignments for order ${order?.orderNumber}:`, error);
+  }
+};
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
 exports.createOrder = async (req, res) => {
   try {
-
-
     // Check if body is empty or undefined
     if (!req.body) {
 
@@ -47,7 +87,7 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    const { items, shippingAddressId, paymentMethod } = req.body;
+    const { items, shippingAddressId, paymentMethod, buyerProfiles } = req.body;
 
 
 
@@ -294,6 +334,7 @@ exports.createOrder = async (req, res) => {
       orderNumber,
       user: req.user._id,
       items: orderItems,
+      buyerProfiles: buyerProfiles.map(profile => profile._id),
       shippingAddress: {
         fullName: shippingAddress.fullName,
         phone: shippingAddress.phone,
@@ -318,6 +359,7 @@ exports.createOrder = async (req, res) => {
     try {
       order = await Order.create(orderData);
       console.log('Order created successfully:', order);
+      //await createMugAssignmentsForOrder(order);
     } catch (error) {
       console.error('Order creation failed:', error);
       console.error('Order validation error:', error.message);
@@ -428,6 +470,7 @@ const createPhonePeV2PaymentRequest = async (order) => {
     paymentRequest: result,
   };
 };
+
 // @desc    PhonePe payment callback
 // @route   POST /api/orders/payment/phonepe/callback
 // @access  Public
@@ -465,7 +508,9 @@ exports.phonePeCallback = async (req, res) => {
         order.paymentDetails.status = 'completed';
         order.paymentDetails.transactionId = transactionId;
         order.orderStatus = 'confirmed';
+        
         await order.save();
+        await createMugAssignmentsForOrder(order);
         console.log(`Order ${order.orderNumber} payment completed successfully`);
       } else {
         console.warn(`Order not found for transaction: ${merchantTransactionId}`);
