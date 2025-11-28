@@ -58,12 +58,13 @@ const validateConfig = () => {
  * @throws {Error} If token fetch fails
  */
 const fetchAccessToken = async () => {
-    try {
-        validateConfig();
+    validateConfig();
 
-        // Updated: Use the pg-sandbox endpoint path from your snippet
-        const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/identity-manager/v1/oauth/token`;
-         console.log(tokenUrl)
+    const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/v1/oauth/token`;
+
+    try {
+
+        console.log('Token URL:', tokenUrl);
         const requestBodyJson = {
             "client_version": PHONEPE_V2_CONFIG.clientVersion,
             "grant_type": "client_credentials",
@@ -151,6 +152,7 @@ const sanitizeMobileNumber = (input) => {
  * @returns {Promise<Object>} Payment response with redirect URL
  */
 const createPaymentRequest = async (paymentData) => {
+    console.log('Payment request:', paymentData);
     try {
         validateConfig();
 
@@ -159,36 +161,60 @@ const createPaymentRequest = async (paymentData) => {
         // Updated: Use the correct payload structure from your snippet
         const requestBody = {
             "amount": paymentData.amount,
-            "expireAfter": paymentData.expireAfter || 1200,
-            "metaInfo": paymentData.metaInfo || {
-                "udf1": "additional-information-1",
-                "udf2": "additional-information-2",
-                "udf3": "additional-information-3",
-                "udf4": "additional-information-4",
-                "udf5": "additional-information-5",
-                "udf6": "additional-information-6",
-                "udf7": "additional-information-7",
-                "udf8": "additional-information-8",
-                "udf9": "additional-information-9",
-                "udf10": "additional-information-10",
-                "udf11": "additional-information-11",
-                "udf12": "additional-information-12",
-                "udf13": "additional-information-13",
-                "udf14": "additional-information-14",
-                "udf15": "additional-information-15"
-            },
+            "expireAfter": 1200,
             "paymentFlow": {
                 "type": "PG_CHECKOUT",
-                "message": paymentData.message || "Payment message used for collect requests",
                 "merchantUrls": {
-                    "redirectUrl": paymentData.redirectUrl || ""
+                    "redirectUrl": paymentData.redirectUrl
+                },
+                "paymentModeConfig": {
+            "enabledPaymentModes": [
+                {
+                    "type": "UPI_INTENT"
+                },
+                {
+                    "type": "UPI_COLLECT"
+                },
+                {
+                    "type": "UPI_QR"
+                },
+            ],
+            "disabledPaymentModes": [
+                {
+                    "type": "NET_BANKING"
+                },
+                {
+                    "type": "CARD",
+                    "cardTypes": [
+                        "DEBIT_CARD",
+                        "CREDIT_CARD"
+                    ]
                 }
+            ]
+        }
             },
-            "merchantOrderId":paymentData.merchantTransactionId
+            "merchantOrderId":paymentData.merchantTransactionId,
+            "metaInfo": {
+        "udf1": "additional-information-1",
+        "udf2": "additional-information-2",
+        "udf3": "additional-information-3",
+        "udf4": "additional-information-4",
+        "udf5": "additional-information-5",
+        "udf6": "additional-information-6",
+        "udf7": "additional-information-7",
+        "udf8": "additional-information-8",
+        "udf9": "additional-information-9",
+        "udf10": "additional-information-10",
+        "udf11": "additional-information-11",
+        "udf12": "additional-information-12",
+        "udf13": "additional-information-13",
+        "udf14": "additional-information-14",
+        "udf15": "additional-information-15"
+    },
         };
 
         // Updated: Use the pg-sandbox endpoint path
-        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/pay`;
+        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/checkout/v2/pay`;
 
         // Updated: Use O-Bearer authorization format from your snippet
         const requestHeaders = {

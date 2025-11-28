@@ -7,6 +7,7 @@ const {
   createPaymentRequest,
   validateConfig
 } = require('../utils/phonepeV2Helper');
+const { randomUUID } = require('crypto');
 
 const validatePhonePeConfig = validateConfig;
 
@@ -374,6 +375,12 @@ exports.createOrder = async (req, res) => {
       const paymentRequest = await createPhonePeV2PaymentRequest(order);
       order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
       await order.save();
+
+      // 🔥 SANDBOX ONLY — auto mark payment as SUCCESS
+      if (process.env.NODE_ENV === "SANDBOX") {
+        order.status = "SUCCESS";   // auto-success for fake payments
+        await order.save();
+      }
 
       return res.status(201).json({
         success: true,
