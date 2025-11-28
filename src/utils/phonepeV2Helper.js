@@ -60,7 +60,7 @@ const validateConfig = () => {
 const fetchAccessToken = async () => {
     validateConfig();
 
-    const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/v1/oauth/token`;
+    const tokenUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/identity-manager/v1/oauth/token`;
 
     try {
 
@@ -69,10 +69,10 @@ const fetchAccessToken = async () => {
             "client_version": PHONEPE_V2_CONFIG.clientVersion,
             "grant_type": "client_credentials",
             "client_id": PHONEPE_V2_CONFIG.clientId,
-            "client_secret":PHONEPE_V2_CONFIG.clientSecret
-          
+            "client_secret": PHONEPE_V2_CONFIG.clientSecret
+
         };
-        
+
         const requestBody = new URLSearchParams(requestBodyJson).toString();
 
         const response = await axios.post(
@@ -84,7 +84,7 @@ const fetchAccessToken = async () => {
                 },
             }
         );
-       
+
         if (!response.data || !response.data.access_token) {
             throw new Error('Invalid token response from PhonePe');
         }
@@ -95,7 +95,7 @@ const fetchAccessToken = async () => {
         const safetyBuffer = 5 * 60 * 1000;
         accessTokenCache = access_token;
         tokenExpiryTime = Date.now() + (expires_in * 1000) - safetyBuffer;
-        
+
         console.log('PhonePe access token fetched successfully');
         return access_token;
     } catch (error) {
@@ -168,53 +168,41 @@ const createPaymentRequest = async (paymentData) => {
                     "redirectUrl": paymentData.redirectUrl
                 },
                 "paymentModeConfig": {
-            "enabledPaymentModes": [
-                {
-                    "type": "UPI_INTENT"
-                },
-                {
-                    "type": "UPI_COLLECT"
-                },
-                {
-                    "type": "UPI_QR"
-                },
-            ],
-            "disabledPaymentModes": [
-                {
-                    "type": "NET_BANKING"
-                },
-                {
-                    "type": "CARD",
-                    "cardTypes": [
-                        "DEBIT_CARD",
-                        "CREDIT_CARD"
+                    "enabledPaymentModes": [
+                        {
+                            "type": "UPI_INTENT"
+                        },
+                        {
+                            "type": "UPI_COLLECT"
+                        },
+                        {
+                            "type": "UPI_QR"
+                        },
                     ]
                 }
-            ]
-        }
             },
-            "merchantOrderId":paymentData.merchantTransactionId,
+            "merchantOrderId": paymentData.merchantTransactionId,
             "metaInfo": {
-        "udf1": "additional-information-1",
-        "udf2": "additional-information-2",
-        "udf3": "additional-information-3",
-        "udf4": "additional-information-4",
-        "udf5": "additional-information-5",
-        "udf6": "additional-information-6",
-        "udf7": "additional-information-7",
-        "udf8": "additional-information-8",
-        "udf9": "additional-information-9",
-        "udf10": "additional-information-10",
-        "udf11": "additional-information-11",
-        "udf12": "additional-information-12",
-        "udf13": "additional-information-13",
-        "udf14": "additional-information-14",
-        "udf15": "additional-information-15"
-    },
+                "udf1": "additional-information-1",
+                "udf2": "additional-information-2",
+                "udf3": "additional-information-3",
+                "udf4": "additional-information-4",
+                "udf5": "additional-information-5",
+                "udf6": "additional-information-6",
+                "udf7": "additional-information-7",
+                "udf8": "additional-information-8",
+                "udf9": "additional-information-9",
+                "udf10": "additional-information-10",
+                "udf11": "additional-information-11",
+                "udf12": "additional-information-12",
+                "udf13": "additional-information-13",
+                "udf14": "additional-information-14",
+                "udf15": "additional-information-15"
+            },
         };
 
         // Updated: Use the pg-sandbox endpoint path
-        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/checkout/v2/pay`;
+        const paymentUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/pay`;
 
         // Updated: Use O-Bearer authorization format from your snippet
         const requestHeaders = {
@@ -234,12 +222,12 @@ const createPaymentRequest = async (paymentData) => {
         console.log('Response status:', response.status);
         console.log('Response data type:', typeof response.data);
         console.log('Response data keys:', response.data ? Object.keys(response.data) : 'null');
-        
+
         // PhonePe V2 API returns data directly, not wrapped in success field
         // Extract redirectUrl from response
         const responseData = response.data;
         const redirectUrl = responseData?.redirectUrl;
-        
+
         console.log('redirectUrl exists?', redirectUrl ? 'YES' : 'NO');
         console.log('redirectUrl value:', redirectUrl);
         console.log('redirectUrl type:', typeof redirectUrl);
@@ -252,6 +240,7 @@ const createPaymentRequest = async (paymentData) => {
             );
         }
 
+        console.log('Now:', responseData);
         // Return the redirectUrl for frontend redirection
         return {
             success: true,
@@ -267,7 +256,7 @@ const createPaymentRequest = async (paymentData) => {
         if (error.response && error.response.data) {
             const responseData = error.response.data;
             console.log('Error response received, checking for redirectUrl:', JSON.stringify(responseData, null, 2));
-            
+
             // If we have redirectUrl in error response, treat it as success
             if (responseData.redirectUrl) {
                 console.log('Found redirectUrl in error response, treating as success');
@@ -280,7 +269,7 @@ const createPaymentRequest = async (paymentData) => {
                     response: responseData,
                 };
             }
-            
+
             console.error('Payment API Error Status:', error.response.status);
             console.error('Payment API Error Headers:', error.response.headers);
             console.error('Payment API Error Body:', JSON.stringify(responseData, null, 2));
@@ -304,7 +293,7 @@ const checkPaymentStatus = async (merchantTransactionId) => {
 
         const accessToken = await getAccessToken();
 
-        const statusUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/checkout/v2/order/${merchantTransactionId}/status`;
+        const statusUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/checkout/v2/order/${merchantTransactionId}/status`;
 
         console.log('Checking PhonePe V2 payment status:', merchantTransactionId);
 
@@ -341,7 +330,7 @@ const processRefund = async (refundData) => {
 
         const accessToken = await getAccessToken();
 
-        const refundUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg-sandbox/payments/v2/refund`;
+        const refundUrl = `${PHONEPE_V2_CONFIG.baseUrl}/apis/pg/payments/v2/refund`;
 
         const payload = {
             merchantId: PHONEPE_V2_CONFIG.merchantId,

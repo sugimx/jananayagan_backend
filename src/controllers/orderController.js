@@ -5,9 +5,9 @@ const MugAssignment = require('../models/Mug');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
 const {
   createPaymentRequest,
-  validateConfig
+  validateConfig,
+  checkPaymentStatus
 } = require('../utils/phonepeV2Helper');
-const { randomUUID } = require('crypto');
 
 const validatePhonePeConfig = validateConfig;
 
@@ -376,12 +376,7 @@ exports.createOrder = async (req, res) => {
       order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
       await order.save();
 
-      // 🔥 SANDBOX ONLY — auto mark payment as SUCCESS
-      if (process.env.NODE_ENV === "SANDBOX") {
-        order.status = "SUCCESS";   // auto-success for fake payments
-        await order.save();
-      }
-
+      
       return res.status(201).json({
         success: true,
         message: 'Order created successfully. Payment request generated.',
