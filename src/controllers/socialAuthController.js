@@ -120,7 +120,7 @@ exports.googleAuth = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Google authentication failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      error: process.env.NODE_ENV === 'PRODUCTION' ? error.message : undefined,
     });
   }
 };
@@ -191,7 +191,7 @@ exports.linkSocialAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to link social account',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      error: process.env.NODE_ENV === 'PRODUCTION' ? error.message : undefined,
     });
   }
 };
