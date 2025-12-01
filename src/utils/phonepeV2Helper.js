@@ -178,6 +178,16 @@ const createPaymentRequest = async (paymentData) => {
                         {
                             "type": "UPI_QR"
                         },
+                        {
+                            "type": "NET_BANKING"
+                        },
+                        {
+                            "type": "CARD",
+                            "cardTypes": [
+                                "DEBIT_CARD",
+                                "CREDIT_CARD"
+                            ]
+                        }
                     ]
                 }
             },

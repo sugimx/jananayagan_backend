@@ -56,7 +56,7 @@ const createMugAssignmentsForOrder = async (order) => {
         mugId: nextId,
       });
 
-      nextId++; 
+      nextId++;
     }
 
     await MugAssignment.insertMany(docs, { ordered: false });
@@ -335,7 +335,7 @@ exports.createOrder = async (req, res) => {
       orderNumber,
       user: req.user._id,
       items: orderItems,
-      buyerProfiles: buyerProfiles.map(profile => profile._id),
+      buyerProfiles: Array.isArray(buyerProfiles) ? buyerProfiles.map(p => p._id) : buyerProfiles?._id ? [buyerProfiles._id] : [],
       shippingAddress: {
         fullName: shippingAddress.fullName,
         phone: shippingAddress.phone,
@@ -376,7 +376,7 @@ exports.createOrder = async (req, res) => {
       order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
       await order.save();
 
-      
+
       return res.status(201).json({
         success: true,
         message: 'Order created successfully. Payment request generated.',
@@ -510,7 +510,6 @@ exports.phonePeCallback = async (req, res) => {
         order.paymentDetails.status = 'completed';
         order.paymentDetails.transactionId = transactionId;
         order.orderStatus = 'confirmed';
-        
         await order.save();
         await createMugAssignmentsForOrder(order);
         console.log(`Order ${order.orderNumber} payment completed successfully`);
