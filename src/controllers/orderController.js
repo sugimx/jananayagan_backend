@@ -14,6 +14,7 @@ const validatePhonePeConfig = validateConfig;
 const SERVER_CONFIG = {
   port: process.env.PORT,
   frontendUrl: process.env.FRONTEND_URL,
+  backendUrl: process.env.BACKEND_URL,
 };
 
 // Validate PhonePe V2 config at startup to fail fast with clear error
@@ -458,7 +459,7 @@ const createPhonePeV2PaymentRequest = async (order) => {
     userId: order.user.toString(),
     amount: order.finalAmount * 100, // Convert to paise
     redirectUrl: `${SERVER_CONFIG.frontendUrl}/profile`,
-    callbackUrl: `${SERVER_CONFIG.frontendUrl}/api/orders/payment/phonepe/callback`,
+    callbackUrl: `${SERVER_CONFIG.backendUrl}/api/orders/payment/phonepe/callback`,
     mobileNumber: order.shippingAddress.phone,
   };
 
@@ -500,7 +501,7 @@ exports.phonePeCallback = async (req, res) => {
     });
 
     // PhonePe V2 uses code 'PAYMENT_SUCCESS' or 'PAYMENT_PENDING' for successful payment
-    if (code === 'PAYMENT_SUCCESS' || responseCode === 'PAYMENT_SUCCESS') {
+    if (code === 'PAYMENT_SUCCESS' || code === 'PAYMENT_COMPLETED' || responseCode === 'PAYMENT_SUCCESS' || decodedResponse.success === true || decodedResponse.state === 'COMPLETED') {
       // Update order payment status
       const order = await Order.findOne({
         'paymentDetails.phonepeTransactionId': merchantTransactionId,
