@@ -710,6 +710,36 @@ exports.getOrderStatusByOrderId = async (req, res) => {
       });
     }
 
+    // ⭐ AUTO-VERIFY PHONEPE PAYMENT HERE ⭐
+    if (
+      order.paymentDetails?.method === 'phonepe' &&
+      order.paymentDetails?.status !== 'completed'
+    ) {
+      try {
+        const merchantTransactionId = order.paymentDetails.phonepeTransactionId;
+
+        if (merchantTransactionId) {
+          const result = await checkPaymentStatus(merchantTransactionId);
+
+          const state =
+            result?.state ||
+            result?.data?.state ||
+            result?.paymentStatus ||
+            result?.status;
+
+          if (state === 'COMPLETED' || state === 'SUCCESS') {
+            order.paymentDetails.status = 'completed';
+            order.orderStatus = 'confirmed';
+            await order.save();
+            await createMugAssignmentsForOrder(order);
+          }
+        }
+      } catch (err) {
+        console.log('PhonePe status check failed:', err.message);
+      }
+    }
+
+
     const data = {
       orderId: order._id,
       orderNumber: order.orderNumber,
