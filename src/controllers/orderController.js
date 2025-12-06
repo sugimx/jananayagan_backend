@@ -551,6 +551,26 @@ exports.getUserOrders = async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+      const pendingOrders = orders.filter(o => o.paymentDetails?.status !== 'completed');
+
+      for (const order of pendingOrders) {
+        if (order.paymentDetails?.phonepeTransactionId) {
+          try {
+            const phonepeStatus = await checkPaymentStatus(order.paymentDetails.phonepeTransactionId);
+  
+            if (phonepeStatus.state === 'COMPLETED' || phonepeStatus.code === 'PAYMENT_SUCCESS') {
+              order.paymentDetails.status = 'completed';
+              order.orderStatus = 'confirmed';
+              await order.save();
+              await createMugAssignmentsForOrder(order);
+            }
+          } catch (error) {
+            console.error(`Failed to update order ${order.orderNumber}:`, error.message);
+          }
+        }
+      }
+
+
     const total = await Order.countDocuments(query);
 
     res.json({
