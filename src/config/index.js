@@ -16,6 +16,12 @@ const indexConfig = {
   PHONEPE_CLIENT_VERSION: process.env.PHONEPE_CLIENT_VERSION,
   PHONEPE_BASE_URL: process.env.PHONEPE_BASE_URL,
   
+  // Cashfree Configuration
+  CASHFREE_APP_ID: process.env.CASHFREE_APP_ID,
+  CASHFREE_SECRET_KEY: process.env.CASHFREE_SECRET_KEY,
+  CASHFREE_BASE_URL: process.env.CASHFREE_BASE_URL,
+  CASHFREE_ENV: process.env.CASHFREE_ENV,
+  
   // Legacy V1 Configuration (deprecated - for reference only)
   PHONEPE_SALT_KEY: process.env.PHONEPE_SALT_KEY,
   PHONEPE_SALT_INDEX: process.env.PHONEPE_SALT_INDEX,
