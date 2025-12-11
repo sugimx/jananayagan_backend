@@ -1,5 +1,4 @@
 const axios = require('axios');
-
 /**
  * Cashfree Helper Utility
  * Minimal wrapper for creating payment orders, checking status and processing refunds
@@ -10,8 +9,8 @@ const axios = require('axios');
 const CASHFREE_CONFIG = {
   appId: process.env.CASHFREE_APP_ID,
   secretKey: process.env.CASHFREE_SECRET_KEY,
-  baseUrl: process.env.CASHFREE_BASE_URL || 'https://api.cashfree.com',
-  env: process.env.CASHFREE_ENV || 'TEST',
+  baseUrl: process.env.CASHFREE_BASE_URL,
+  env: process.env.CASHFREE_ENV,
 };
 
 const validateConfig = () => {
@@ -33,19 +32,20 @@ const validateConfig = () => {
  */
 const createPaymentRequest = async (paymentData) => {
   validateConfig();
-
+  console.log('Creating Cashfree payment request with data:', paymentData);
   // Build request body using common Cashfree order payload fields
   const orderPayload = {
     order_id: paymentData.merchantTransactionId,
     order_amount: String((paymentData.amount / 100).toFixed(2)), // convert paise -> rupees if amount given in paise
     order_currency: 'INR',
     customer_details: {
-      customer_id: paymentData.userId || paymentData.customer?.id || paymentData.merchantTransactionId,
+      customer_id: paymentData.userId || '',
       customer_email: paymentData.customer?.email || '',
       customer_phone: paymentData.mobileNumber || paymentData.customer?.phone || '',
+      customer_name: paymentData.customer?.name || '',
     },
     order_meta: {
-      return_url: paymentData.callbackUrl || paymentData.redirectUrl,
+      return_url: paymentData.redirectUrl,
     },
   };
 
@@ -55,22 +55,34 @@ const createPaymentRequest = async (paymentData) => {
     'Content-Type': 'application/json',
     'x-client-id': CASHFREE_CONFIG.appId,
     'x-client-secret': CASHFREE_CONFIG.secretKey,
+    "x-api-version": "2025-01-01"
   };
 
   try {
     const resp = await axios.post(url, orderPayload, { headers });
 
-    const data = resp.data || {};
+    console.log('Cashfree createPaymentRequest response:', resp.data);
 
-    // Common places where Cashfree may expose a payment link
-    const redirectUrl = data.payment_link || data.order_link || data.payment_link_url || data.redirect_url || data.data?.payment_link || data.data?.payment_link_url;
+    const returnUrl = resp.data.order_meta?.return_url;
+    const data = resp.data;
 
-    if (!redirectUrl) {
-      // Return raw response when no obvious redirect URL found
-      return { success: true, redirectUrl: null, response: data };
-    }
+    // const sessionUrl = `${CASHFREE_CONFIG.baseUrl}/pg/links`;
+    // const data = {
+    //     ... resp.data,
+    //   cf_order_id: cfOrderId,
+    //   link_expiry_time: 30, // in minutes
+    //   link_amount: orderPayload.order_amount,
+    //   link_currency: orderPayload.order_currency,
+    //   link_meta: {
+    //     return_url: paymentData.redirectUrl,
+    //   },
+    // };
+    // const sessionResp = await axios.post(sessionUrl, {data}, { headers });
+    // const paymentLink = sessionResp.data.payment_link;
+    // console.log('Cashfree session response:', sessionResp.data);
+    // const redirectUrl = paymentLink;
 
-    return { success: true, redirectUrl, response: data };
+    return { success: true, redirectUrl:returnUrl, response: data };
   } catch (error) {
     console.error('Error creating Cashfree payment:', error.message);
     if (error.response) {
@@ -90,6 +102,7 @@ const checkPaymentStatus = async (merchantTransactionId) => {
     'Accept': 'application/json',
     'x-client-id': CASHFREE_CONFIG.appId,
     'x-client-secret': CASHFREE_CONFIG.secretKey,
+    "x-api-version": "2025-01-01"
   };
 
   try {
@@ -112,6 +125,7 @@ const processRefund = async (refundData) => {
     'Content-Type': 'application/json',
     'x-client-id': CASHFREE_CONFIG.appId,
     'x-client-secret': CASHFREE_CONFIG.secretKey,
+    "x-api-version": "2025-01-01"
   };
 
   const payload = {

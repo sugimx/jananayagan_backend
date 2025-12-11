@@ -404,6 +404,7 @@ exports.createOrder = async (req, res) => {
         message: 'Order created successfully. Cashfree payment request generated.',
         data: {
           order,
+          payment_session_id: paymentRequest.paymentRequest.response.payment_session_id,
           paymentRequest,
         },
       });
@@ -483,9 +484,6 @@ const createPhonePeV2PaymentRequest = async (order) => {
     callbackUrl: `${SERVER_CONFIG.backendUrl}/api/orders/payment/phonepe/callback`,
     mobileNumber: order.shippingAddress.phone,
   };
-
-  console.log('Creating PhonePe V2 payment request for order:', order.orderNumber);
-
   const result = await phonepeCreatePaymentRequest(paymentData);
 
   return {
@@ -512,11 +510,9 @@ const createCashfreePaymentRequest = async (order) => {
     mobileNumber: order.shippingAddress.phone,
     customer: {
       id: order.user.toString(),
+      name: order.shippingAddress.fullName,
     },
   };
-
-  console.log('Creating Cashfree payment request for order:', order.orderNumber);
-
   const result = await cashfreeHelper.createPaymentRequest(paymentData);
 
   return {
@@ -715,7 +711,7 @@ exports.getUserOrdersSummary = async (req, res) => {
         try {
           const phonepeStatus = await checkPaymentStatus(order.paymentDetails.phonepeTransactionId);
 
-          if (phonepeStatus.state === 'COMPLETED' || phonepeStatus.code === 'PAYMENT_SUCCESS') {
+          if (phonepeStatus.order_status === 'PAID') {
             order.paymentDetails.status = 'completed';
             order.orderStatus = 'confirmed';
             await order.save();
@@ -817,6 +813,7 @@ exports.getOrderStatusByOrderId = async (req, res) => {
   try {
     const param = req.params.orderId || req.params.status;
 
+    console.log('Received param for order/status summary:', req.params);
     // Check if param is a valid status - if so, it should use the status route
     // But since this route comes first, we check and handle orderId here
     const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
@@ -865,13 +862,9 @@ exports.getOrderStatusByOrderId = async (req, res) => {
         if (merchantTransactionId) {
           const result = await checkPaymentStatus(merchantTransactionId);
 
-          const state =
-            result?.state ||
-            result?.data?.state ||
-            result?.paymentStatus ||
-            result?.status;
+          const state = result?.order_status || "";
 
-          if (state === 'COMPLETED' || state === 'SUCCESS') {
+          if (state === 'PAID') {
             order.paymentDetails.status = 'completed';
             order.orderStatus = 'confirmed';
             await order.save();
