@@ -55,7 +55,7 @@ const createPaymentRequest = async (paymentData) => {
     'Content-Type': 'application/json',
     'x-client-id': CASHFREE_CONFIG.appId,
     'x-client-secret': CASHFREE_CONFIG.secretKey,
-    "x-api-version": "2025-01-01"
+    "x-api-version": "2023-08-01"
   };
 
   try {
@@ -102,7 +102,7 @@ const checkPaymentStatus = async (merchantTransactionId) => {
     'Accept': 'application/json',
     'x-client-id': CASHFREE_CONFIG.appId,
     'x-client-secret': CASHFREE_CONFIG.secretKey,
-    "x-api-version": "2025-01-01"
+    "x-api-version": "2023-08-01"
   };
 
   try {
@@ -125,7 +125,7 @@ const processRefund = async (refundData) => {
     'Content-Type': 'application/json',
     'x-client-id': CASHFREE_CONFIG.appId,
     'x-client-secret': CASHFREE_CONFIG.secretKey,
-    "x-api-version": "2025-01-01"
+    "x-api-version": "2023-08-01"
   };
 
   const payload = {
