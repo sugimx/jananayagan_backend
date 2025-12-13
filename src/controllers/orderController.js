@@ -3,13 +3,18 @@ const Order = require('../models/Order');
 const Address = require('../models/Address');
 const MugAssignment = require('../models/Mug');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
-const {
-  createPaymentRequest,
-  validateConfig,
-  checkPaymentStatus
-} = require('../utils/phonepeV2Helper');
 
-const validatePhonePeConfig = validateConfig;
+// PhonePe helper (existing)
+// const phonepeHelper = require('../utils/phonepeV2Helper');
+// const {
+//   createPaymentRequest: phonepeCreatePaymentRequest,
+//   validateConfig: validatePhonePeConfig,
+//   checkPaymentStatus: phonepeCheckPaymentStatus,
+// } = phonepeHelper;
+
+// Cashfree helper (new)
+const cashfreeHelper = require('../utils/cashfreeHelper');
+const { validateConfig, createPaymentRequest, checkPaymentStatus } = cashfreeHelper;
 
 const SERVER_CONFIG = {
   port: process.env.PORT,
@@ -19,7 +24,7 @@ const SERVER_CONFIG = {
 
 // Validate PhonePe V2 config at startup to fail fast with clear error
 try {
-  validatePhonePeConfig();
+  validateConfig();
   console.log('PhonePe V2 configuration validated successfully');
 } catch (error) {
   console.error('PhonePe V2 configuration error:', error.message);
@@ -372,17 +377,34 @@ exports.createOrder = async (req, res) => {
     }
 
     // If payment method is PhonePe, create payment request
+    // if (paymentMethod === 'phonepe') {
+    //   const paymentRequest = await createPhonePeV2PaymentRequest(order);
+    //   order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
+    //   await order.save();
+
+
+    //   return res.status(201).json({
+    //     success: true,
+    //     message: 'Order created successfully. Payment request generated.',
+    //     data: {
+    //       order,
+    //       paymentRequest,
+    //     },
+    //   });
+    // }
+
+    // If payment method is Cashfree, create payment request
     if (paymentMethod === 'phonepe') {
-      const paymentRequest = await createPhonePeV2PaymentRequest(order);
+      const paymentRequest = await createCashfreePaymentRequest(order);
       order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
       await order.save();
 
-
       return res.status(201).json({
         success: true,
-        message: 'Order created successfully. Payment request generated.',
+        message: 'Order created successfully. Cashfree payment request generated.',
         data: {
           order,
+          payment_session_id: paymentRequest.paymentRequest.response.payment_session_id,
           paymentRequest,
         },
       });
@@ -462,10 +484,36 @@ const createPhonePeV2PaymentRequest = async (order) => {
     callbackUrl: `${SERVER_CONFIG.backendUrl}/api/orders/payment/phonepe/callback`,
     mobileNumber: order.shippingAddress.phone,
   };
+  const result = await phonepeCreatePaymentRequest(paymentData);
 
-  console.log('Creating PhonePe V2 payment request for order:', order.orderNumber);
+  return {
+    merchantTransactionId,
+    redirectUrl: result.redirectUrl,
+    paymentRequest: result,
+  };
+};
 
-  const result = await createPaymentRequest(paymentData);
+/**
+ * Create Cashfree payment request
+ */
+const createCashfreePaymentRequest = async (order) => {
+  const timestamp = Date.now().toString().slice(-10);
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const merchantTransactionId = `TXN_${timestamp}_${random}`;
+
+  const paymentData = {
+    merchantTransactionId,
+    userId: order.user.toString(),
+    amount: order.finalAmount * 100, // paise expected by helper (helper converts to rupees)
+    redirectUrl: `${SERVER_CONFIG.frontendUrl}/profile`,
+    callbackUrl: `${SERVER_CONFIG.backendUrl}/api/orders/payment/cashfree/callback`,
+    mobileNumber: order.shippingAddress.phone,
+    customer: {
+      id: order.user.toString(),
+      name: order.shippingAddress.fullName,
+    },
+  };
+  const result = await cashfreeHelper.createPaymentRequest(paymentData);
 
   return {
     merchantTransactionId,
@@ -534,6 +582,79 @@ exports.phonePeCallback = async (req, res) => {
   }
 };
 
+// @desc    Create Cashfree payment request
+// @route   POST /api/orders/:id/payment/cashfree
+// @access  Private
+exports.createCashfreePayment = async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.paymentDetails.status === 'completed') {
+      return res.status(400).json({ success: false, message: 'Order is already paid' });
+    }
+
+    const paymentRequest = await createCashfreePaymentRequest(order);
+
+    order.paymentDetails.phonepeTransactionId = paymentRequest.merchantTransactionId;
+    await order.save();
+
+    res.json({ success: true, message: 'Cashfree payment request created successfully', data: paymentRequest });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Cashfree payment callback
+// @route   POST /api/orders/payment/cashfree/callback
+// @access  Public
+exports.cashfreeCallback = async (req, res) => {
+  try {
+    console.log('Cashfree callback received:', req.body);
+
+    const payload = req.body || {};
+
+    // Cashfree sends status fields like: orderId, orderAmount, txStatus/orderStatus
+    const merchantTransactionId = payload.orderId || payload.order_id || payload.orderID || payload.order_id;
+    const status = payload.orderStatus || payload.txStatus || payload.status || payload.order_status;
+
+    if (!merchantTransactionId) {
+      console.warn('Cashfree callback missing order id');
+      return res.json({ success: false, message: 'Missing order id' });
+    }
+
+    // Treat common success indicators
+    const isSuccess = String(status).toLowerCase().includes('paid') || String(status).toLowerCase().includes('success') || String(status).toLowerCase().includes('completed');
+
+    if (isSuccess) {
+      const order = await Order.findOne({ 'paymentDetails.phonepeTransactionId': merchantTransactionId });
+      if (order) {
+        order.paymentDetails.status = 'completed';
+        order.paymentDetails.transactionId = payload.referenceId || payload.txId || payload.transactionId || payload.txnId;
+        order.orderStatus = 'confirmed';
+        await order.save();
+        await createMugAssignmentsForOrder(order);
+        console.log(`Order ${order.orderNumber} Cashfree payment completed successfully`);
+      } else {
+        console.warn(`Order not found for Cashfree transaction: ${merchantTransactionId}`);
+      }
+    } else {
+      console.warn('Cashfree callback indicates non-success status:', status);
+    }
+
+    res.json({ success: true, message: 'Cashfree callback processed' });
+  } catch (error) {
+    console.error('Error processing Cashfree callback:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get user orders
 // @route   GET /api/orders
 // @access  Private
@@ -590,7 +711,7 @@ exports.getUserOrdersSummary = async (req, res) => {
         try {
           const phonepeStatus = await checkPaymentStatus(order.paymentDetails.phonepeTransactionId);
 
-          if (phonepeStatus.state === 'COMPLETED' || phonepeStatus.code === 'PAYMENT_SUCCESS') {
+          if (phonepeStatus.order_status === 'PAID') {
             order.paymentDetails.status = 'completed';
             order.orderStatus = 'confirmed';
             await order.save();
@@ -692,6 +813,7 @@ exports.getOrderStatusByOrderId = async (req, res) => {
   try {
     const param = req.params.orderId || req.params.status;
 
+    console.log('Received param for order/status summary:', req.params);
     // Check if param is a valid status - if so, it should use the status route
     // But since this route comes first, we check and handle orderId here
     const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
@@ -740,13 +862,9 @@ exports.getOrderStatusByOrderId = async (req, res) => {
         if (merchantTransactionId) {
           const result = await checkPaymentStatus(merchantTransactionId);
 
-          const state =
-            result?.state ||
-            result?.data?.state ||
-            result?.paymentStatus ||
-            result?.status;
+          const state = result?.order_status || "";
 
-          if (state === 'COMPLETED' || state === 'SUCCESS') {
+          if (state === 'PAID') {
             order.paymentDetails.status = 'completed';
             order.orderStatus = 'confirmed';
             await order.save();

@@ -110,6 +110,16 @@ cp env.example .env
 npm run dev
 ```
 
+If you're switching to Cashfree, add these variables to your `.env` file:
+
+```
+# Cashfree
+CASHFREE_APP_ID=your_cashfree_app_id
+CASHFREE_SECRET_KEY=your_cashfree_secret_key
+CASHFREE_BASE_URL=https://api.cashfree.com
+CASHFREE_ENV=TEST
+```
+
 ---
 
 ### Register User

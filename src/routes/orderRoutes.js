@@ -4,6 +4,8 @@ const {
   createOrder,
   createPhonePePayment,
   phonePeCallback,
+  createCashfreePayment,
+  cashfreeCallback,
   getUserOrders,
   getUserOrdersSummary,
   getOrdersByStatusSummary,
@@ -15,8 +17,10 @@ const {
 const { protect, protectPayment } = require('../middleware/authMiddleware');
 
 router.post('/payment/phonepe/callback', phonePeCallback);
+router.post('/payment/cashfree/callback', cashfreeCallback);
 router.post('/', protectPayment, createOrder);
 router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
+router.post('/:id/payment/cashfree', protectPayment, createCashfreePayment);
 router.get('/', protect, getUserOrders);
 router.get('/summary', protect, getUserOrdersSummary);
 router.get('/status/:orderId/summary', protect, getOrderStatusByOrderId);
