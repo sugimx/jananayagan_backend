@@ -12,8 +12,6 @@ const {
   getOrder,
   updateOrderStatus,
   getOrderInvoice,
-  getCupListData,
-  getCupListDataByFilter,
 } = require('../controllers/orderController');
 const { handleCashfreeWebhook } = require('../webhooks/cashfreeWebhook');
 const { protect, protectPayment } = require('../middleware/authMiddleware');
@@ -21,13 +19,50 @@ const { protect, protectPayment } = require('../middleware/authMiddleware');
 router.post('/payment/phonepe/callback', phonePeCallback);
 router.post('/payment/cashfree/callback', handleCashfreeWebhook);
 
-// Test endpoint
-router.get('/test-cuplist', (req, res) => {
-  res.json({ message: 'Cup list endpoint is accessible', timestamp: new Date().toISOString() });
+// Public endpoints - NO authentication required
+router.get('/cuplist/all', async (req, res) => {
+  try {
+    const result = await require('../utils/googleSheetsHelper').getCupListData();
+    res.json({
+      success: true,
+      sheetName: result.sheetName,
+      count: result.count,
+      data: result.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch Cup List data: ' + error.message,
+    });
+  }
 });
 
-router.get('/cuplist/all', getCupListData);
-router.get('/cuplist/search', getCupListDataByFilter);
+router.get('/cuplist/search', async (req, res) => {
+  try {
+    const filters = {};
+    const validFilters = ['Name', 'Phone', 'Email', 'Address', 'Location', 'State', 'Pincode', 'Order ID', 'Cup'];
+    validFilters.forEach(filterKey => {
+      const queryKey = filterKey.toLowerCase().replace(' ', '');
+      if (req.query[queryKey]) {
+        filters[filterKey] = req.query[queryKey];
+      }
+    });
+    const limit = req.query.limit ? parseInt(req.query.limit) : null;
+    const result = await require('../utils/googleSheetsHelper').getCupListDataByFilter(filters, limit);
+    res.json({
+      success: true,
+      sheetName: result.sheetName,
+      count: result.count,
+      filtersApplied: result.filtersApplied,
+      data: result.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch filtered Cup List data: ' + error.message,
+    });
+  }
+});
 router.post('/', protectPayment, createOrder);
 router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
 router.post('/:id/payment/cashfree', protectPayment, createCashfreePayment);
