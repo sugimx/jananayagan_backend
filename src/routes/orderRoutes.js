@@ -20,6 +20,12 @@ const { protect, protectPayment } = require('../middleware/authMiddleware');
 
 router.post('/payment/phonepe/callback', phonePeCallback);
 router.post('/payment/cashfree/callback', handleCashfreeWebhook);
+
+// Test endpoint
+router.get('/test-cuplist', (req, res) => {
+  res.json({ message: 'Cup list endpoint is accessible', timestamp: new Date().toISOString() });
+});
+
 router.get('/cuplist/all', getCupListData);
 router.get('/cuplist/search', getCupListDataByFilter);
 router.post('/', protectPayment, createOrder);
