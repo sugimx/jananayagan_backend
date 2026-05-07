@@ -20,6 +20,7 @@ const { protect, protectPayment } = require('../middleware/authMiddleware');
 
 // ⭐ IMPORTANT: Public routes MUST come FIRST before protected routes
 // Otherwise they'll never be reached
+// These routes handle public access to Cup List data
 
 // Test endpoint (no auth) - simple JSON response
 router.get('/test-simple', (req, res) => {
