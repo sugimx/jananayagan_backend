@@ -18,16 +18,23 @@ const {
 const { handleCashfreeWebhook } = require('../webhooks/cashfreeWebhook');
 const { protect, protectPayment } = require('../middleware/authMiddleware');
 
-router.post('/payment/phonepe/callback', phonePeCallback);
-router.post('/payment/cashfree/callback', handleCashfreeWebhook);
+// ⭐ IMPORTANT: Public routes MUST come FIRST before protected routes
+// Otherwise they'll never be reached
 
-// Test endpoint
+// Test endpoint (no auth)
 router.get('/test-cuplist', (req, res) => {
   res.json({ message: 'Cup list endpoint is accessible', timestamp: new Date().toISOString() });
 });
 
+// Cup list endpoints (no auth required)
 router.get('/cuplist/all', getCupListData);
 router.get('/cuplist/search', getCupListDataByFilter);
+
+// Webhook routes (no auth)
+router.post('/payment/phonepe/callback', phonePeCallback);
+router.post('/payment/cashfree/callback', handleCashfreeWebhook);
+
+// ⭐ Protected routes come AFTER public routes
 router.post('/', protectPayment, createOrder);
 router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
 router.post('/:id/payment/cashfree', protectPayment, createCashfreePayment);
