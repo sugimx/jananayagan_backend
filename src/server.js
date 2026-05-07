@@ -25,6 +25,15 @@ app.use('/uploads', express.static('uploads'));
 // Connect to Database
 connectDB();
 
+// Handle preflight requests for all routes
+app.options('*', cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: false,
+  optionsSuccessStatus: 200
+}));
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Giveway Backend API' });
