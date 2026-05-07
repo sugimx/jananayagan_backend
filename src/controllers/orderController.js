@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Address = require('../models/Address');
 const MugAssignment = require('../models/Mug');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
+const googleSheetsHelper = require('../utils/googleSheetsHelper');
 
 // PhonePe helper (existing)
 // const phonepeHelper = require('../utils/phonepeV2Helper');
@@ -1054,6 +1055,80 @@ exports.getOrderInvoice = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+// @desc    Get all Cup List data from Google Sheets
+// @route   GET /api/orders/cuplist/all
+// @access  Public
+exports.getCupListData = async (req, res) => {
+  try {
+    console.log('[CupList] Request received at', new Date().toISOString());
+    
+    const result = await googleSheetsHelper.getCupListData();
+    
+    console.log('[CupList] Google Sheets returned:', result.count, 'records');
+    
+    // Always return 200 even if data is empty, but include error info
+    return res.json({
+      success: true,
+      message: result.count > 0 ? 'Cup List retrieved successfully' : 'No cup list data available',
+      sheetName: result.sheetName,
+      count: result.count,
+      data: result.data || [],
+      source: 'google_sheets',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[CupList] Error fetching Cup List:', error.message, error.stack);
+    
+    // Return 200 with empty data instead of 500 error - graceful fallback
+    return res.json({
+      success: true,
+      message: 'Cup List endpoint is accessible but data unavailable',
+      sheetName: 'Cup List',
+      count: 0,
+      data: [],
+      error: error.message,
+      source: 'error',
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+// @desc    Get filtered Cup List data from Google Sheets
+// @route   GET /api/orders/cuplist/search
+// @access  Private
+// @query   name, phone, email, orderid, state, pincode, limit
+exports.getCupListDataByFilter = async (req, res) => {
+  try {
+    // Build filter object from query parameters
+    const filters = {};
+    const validFilters = ['Name', 'Phone', 'Email', 'Address', 'Location', 'State', 'Pincode', 'Order ID', 'Cup'];
+    
+    validFilters.forEach(filterKey => {
+      const queryKey = filterKey.toLowerCase().replace(' ', '');
+      if (req.query[queryKey]) {
+        filters[filterKey] = req.query[queryKey];
+      }
+    });
+
+    const limit = req.query.limit ? parseInt(req.query.limit) : null;
+
+    const result = await googleSheetsHelper.getCupListDataByFilter(filters, limit);
+    
+    res.json({
+      success: true,
+      sheetName: result.sheetName,
+      count: result.count,
+      filtersApplied: result.filtersApplied,
+      data: result.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch filtered Cup List data: ' + error.message,
     });
   }
 };
