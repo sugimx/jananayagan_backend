@@ -55,9 +55,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+// Export for Vercel serverless deployment
+module.exports = app;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Only start the server if not running on Vercel
+if (process.env.NODE_ENV !== 'PRODUCTION' || !process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
 

@@ -1,3 +1,27 @@
 {
-  "version": 2
+  "version": 2,
+  "buildCommand": "npm install",
+  "devCommand": "npm run dev",
+  "env": {
+    "NODE_ENV": "PRODUCTION"
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "src/server.js"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "src/server.js"
+    },
+    {
+      "source": "/:path*",
+      "destination": "src/server.js"
+    }
+  ],
+  "functions": {
+    "src/server.js": {
+      "maxDuration": 30
+    }
+  }
 }
