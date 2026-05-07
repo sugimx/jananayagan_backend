@@ -27,7 +27,7 @@ connectDB();
 
 // Routes
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to Giveway Backend API - v2' });
+  res.json({ message: 'Welcome to Giveway Backend API' });
 });
 
 // Import routes
