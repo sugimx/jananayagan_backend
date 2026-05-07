@@ -5,7 +5,6 @@ const {
   createPhonePePayment,
   phonePeCallback,
   createCashfreePayment,
-  cashfreeCallback,
   getUserOrders,
   getUserOrdersSummary,
   getOrdersByStatusSummary,
@@ -13,11 +12,16 @@ const {
   getOrder,
   updateOrderStatus,
   getOrderInvoice,
+  getCupListData,
+  getCupListDataByFilter,
 } = require('../controllers/orderController');
+const { handleCashfreeWebhook } = require('../webhooks/cashfreeWebhook');
 const { protect, protectPayment } = require('../middleware/authMiddleware');
 
 router.post('/payment/phonepe/callback', phonePeCallback);
-router.post('/payment/cashfree/callback', cashfreeCallback);
+router.post('/payment/cashfree/callback', handleCashfreeWebhook);
+router.get('/cuplist/all', getCupListData);
+router.get('/cuplist/search', getCupListDataByFilter);
 router.post('/', protectPayment, createOrder);
 router.post('/:id/payment/phonepe', protectPayment, createPhonePePayment);
 router.post('/:id/payment/cashfree', protectPayment, createCashfreePayment);

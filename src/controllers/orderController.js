@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Address = require('../models/Address');
 const MugAssignment = require('../models/Mug');
 const { generateMultipleMugSerials } = require('../utils/mugSerialGenerator');
+const googleSheetsHelper = require('../utils/googleSheetsHelper');
 
 // PhonePe helper (existing)
 // const phonepeHelper = require('../utils/phonepeV2Helper');
@@ -1054,6 +1055,63 @@ exports.getOrderInvoice = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+// @desc    Get all Cup List data from Google Sheets
+// @route   GET /api/orders/cuplist/all
+// @access  Private
+exports.getCupListData = async (req, res) => {
+  try {
+    const result = await googleSheetsHelper.getCupListData();
+    
+    res.json({
+      success: true,
+      sheetName: result.sheetName,
+      count: result.count,
+      data: result.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch Cup List data: ' + error.message,
+    });
+  }
+};
+
+// @desc    Get filtered Cup List data from Google Sheets
+// @route   GET /api/orders/cuplist/search
+// @access  Private
+// @query   name, phone, email, orderid, state, pincode, limit
+exports.getCupListDataByFilter = async (req, res) => {
+  try {
+    // Build filter object from query parameters
+    const filters = {};
+    const validFilters = ['Name', 'Phone', 'Email', 'Address', 'Location', 'State', 'Pincode', 'Order ID', 'Cup'];
+    
+    validFilters.forEach(filterKey => {
+      const queryKey = filterKey.toLowerCase().replace(' ', '');
+      if (req.query[queryKey]) {
+        filters[filterKey] = req.query[queryKey];
+      }
+    });
+
+    const limit = req.query.limit ? parseInt(req.query.limit) : null;
+
+    const result = await googleSheetsHelper.getCupListDataByFilter(filters, limit);
+    
+    res.json({
+      success: true,
+      sheetName: result.sheetName,
+      count: result.count,
+      filtersApplied: result.filtersApplied,
+      data: result.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch filtered Cup List data: ' + error.message,
     });
   }
 };
