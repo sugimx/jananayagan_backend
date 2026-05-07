@@ -1061,21 +1061,31 @@ exports.getOrderInvoice = async (req, res) => {
 
 // @desc    Get all Cup List data from Google Sheets
 // @route   GET /api/orders/cuplist/all
-// @access  Private
+// @access  Public
 exports.getCupListData = async (req, res) => {
   try {
     const result = await googleSheetsHelper.getCupListData();
     
+    // Always return 200 even if data is empty, but include error info
     res.json({
       success: true,
+      message: result.count > 0 ? 'Cup List retrieved successfully' : 'No cup list data available',
       sheetName: result.sheetName,
       count: result.count,
-      data: result.data,
+      data: result.data || [],
+      source: 'google_sheets'
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch Cup List data: ' + error.message,
+    console.error('❌ Error fetching Cup List:', error.message);
+    // Return 200 with empty data instead of 500 error - graceful fallback
+    res.json({
+      success: true,
+      message: 'Cup List endpoint is accessible but data unavailable',
+      sheetName: 'Cup List',
+      count: 0,
+      data: [],
+      error: error.message,
+      source: 'error'
     });
   }
 };

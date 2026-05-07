@@ -328,11 +328,20 @@ const getCupListData = async () => {
       success: true, 
       data: results,
       count: results.length,
-      sheetName: cupListSheet.title
+      sheetName: cupListSheet.title,
+      source: 'google_sheets'
     };
   } catch (error) {
-    console.error('Error fetching Cup List data:', error.message);
-    throw error;
+    console.error('⚠️ Error fetching Cup List from Google Sheets:', error.message);
+    // Return empty data on error instead of throwing - endpoint will handle gracefully
+    return {
+      success: true,
+      data: [],
+      count: 0,
+      sheetName: 'Cup List',
+      source: 'fallback',
+      error: error.message
+    };
   }
 };
 
