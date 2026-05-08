@@ -222,6 +222,10 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
         }
       });
     }
+    
+    // Debug: Log all field names to identify exact keys
+    console.log('🔍 Cashfree webhook custom fields:', Object.keys(customFields));
+    console.log('📋 Full customFields object:', customFields);
 
     // Add amount details as custom fields too
     let itemIndex = 1;
@@ -249,8 +253,8 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
         'Form URL': formData.form_url || '',
         'Form Currency': formData.form_currency || 'INR',
         // Map Cashfree form fields to Excel columns
-        'Address': customFields['Address line 1'] || customFields['Address'] || '',
-        'Location': customFields['City'] || customFields['Location'] || '',
+        'Address': customerDetails.customer_address || customFields['AddressLine1'] || customFields['address'] || customFields['addressLine'] || '',
+        'Location': customFields['City'] || '',
         'State': customFields['State'] || '',
         'Pincode': customFields['Pincode'] || '',
         'Cup': customFields['Cup'] || '',
