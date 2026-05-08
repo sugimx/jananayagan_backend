@@ -248,9 +248,9 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
         'CF Form ID': formData.cf_form_id || '',
         'Form URL': formData.form_url || '',
         'Form Currency': formData.form_currency || 'INR',
-        // Extract customer fields for Cup List mapping
-        'Address': customFields['Address'] || '',
-        'Location': customFields['Location'] || '',
+        // Map Cashfree form fields to Excel columns
+        'Address': customFields['Address line 1'] || customFields['Address'] || '',
+        'Location': customFields['City'] || customFields['Location'] || '',
         'State': customFields['State'] || '',
         'Pincode': customFields['Pincode'] || '',
         'Cup': customFields['Cup'] || '',
