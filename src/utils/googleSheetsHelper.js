@@ -151,8 +151,8 @@ const addPaymentToSheet = async (paymentData) => {
             'Name': paymentData.customerName,
             'Phone': paymentData.customerPhone,
             'Email': paymentData.customerEmail,
-            'Address': paymentData.customFields?.['Address'] || '',
-            'Location': paymentData.customFields?.['Location'] || '',
+            'Address': paymentData.customFields?.['Address'] || paymentData.customFields?.['Address Line 1'] || '',
+            'Location': paymentData.customFields?.['Location'] || paymentData.customFields?.['City'] || '',
             'State': paymentData.customFields?.['State'] || '',
             'Pincode': paymentData.customFields?.['Pincode'] || '',
             'Order ID': paymentData.orderId,
@@ -224,6 +224,7 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
     }
     
     // Debug: Log all field names to identify exact keys
+    console.log('🔍 Cashfree webhook payload:', webhookPayload);
     console.log('🔍 Cashfree webhook custom fields:', Object.keys(customFields));
     console.log('📋 Full customFields object:', customFields);
 
@@ -253,7 +254,7 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
         'Form URL': formData.form_url || '',
         'Form Currency': formData.form_currency || 'INR',
         // Map Cashfree form fields to Excel columns
-        'Address': customerDetails.customer_address || customFields['AddressLine1'] || customFields['address'] || customFields['addressLine'] || '',
+        'Address': customFields['Address Line 1'] || '',
         'Location': customFields['City'] || '',
         'State': customFields['State'] || '',
         'Pincode': customFields['Pincode'] || '',
