@@ -141,46 +141,67 @@ const addPaymentToSheet = async (paymentData) => {
             }
           }
           
-          // Create mapping for customer data based on available columns
-          const firstSheetData = {};
+          // Extract quantity from paymentData or custom fields (default to 1 if not provided)
+          let quantity = paymentData.quantity || 1;
           
-          // Direct column mappings for Cup List sheet
-          const directMappings = {
-            'No': nextNo,  // Auto-increment
-            'Cup': nextCup,  // Auto-increment
-            'Name': paymentData.customerName,
-            'Phone': paymentData.customerPhone,
-            'Email': paymentData.customerEmail,
-            'Address': paymentData.customFields?.['Address'] || paymentData.customFields?.['Address Line 1'] || '',
-            'Location': paymentData.customFields?.['Location'] || paymentData.customFields?.['City'] || '',
-            'State': paymentData.customFields?.['State'] || '',
-            'Pincode': paymentData.customFields?.['Pincode'] || '',
-            'Order ID': paymentData.orderId,
-            'Order Status': paymentData.orderStatus,
-            'Amount': paymentData.amount,
-            'Customer Email': paymentData.customerEmail,
-            'Customer Name': paymentData.customerName,
-            'Customer Phone': paymentData.customerPhone,
-            'Transaction ID': paymentData.transactionId,
-            'Payment Time': paymentData.paymentTime,
-          };
+          // If quantity not explicitly provided, try to extract from Item 1 Quantity
+          if (quantity === 1 && paymentData.customFields?.['Item 1 Quantity']) {
+            quantity = parseInt(paymentData.customFields['Item 1 Quantity']) || 1;
+          }
           
-          // Add all mapped columns that exist in the sheet
-          firstSheetHeaders.forEach((header) => {
-            if (header && directMappings.hasOwnProperty(header)) {
-              const value = directMappings[header];
-              if (value || value === 0) {  // Include 0 values
-                firstSheetData[header] = value;
+          console.log(`📦 Processing order with quantity: ${quantity}`);
+          
+          // Create rows for each quantity item
+          const rowsToAdd = [];
+          for (let i = 0; i < quantity; i++) {
+            const firstSheetData = {};
+            
+            // Direct column mappings for Cup List sheet
+            const directMappings = {
+              'No': nextNo + i,  // Auto-increment per row
+              'Cup': nextCup + i,  // Auto-increment cup number for each quantity
+              'Name': paymentData.customerName,
+              'Phone': paymentData.customerPhone,
+              'Email': paymentData.customerEmail,
+              'Address': paymentData.customFields?.['Address'] || paymentData.customFields?.['Address Line 1'] || '',
+              'Location': paymentData.customFields?.['Location'] || paymentData.customFields?.['City'] || '',
+              'State': paymentData.customFields?.['State'] || '',
+              'Pincode': paymentData.customFields?.['Pincode'] || '',
+              'Order ID': paymentData.orderId,
+              'Order Status': paymentData.orderStatus,
+              'Amount': paymentData.amount,
+              'Customer Email': paymentData.customerEmail,
+              'Customer Name': paymentData.customerName,
+              'Customer Phone': paymentData.customerPhone,
+              'Transaction ID': paymentData.transactionId,
+              'Payment Time': paymentData.paymentTime,
+            };
+            
+            // Add all mapped columns that exist in the sheet
+            firstSheetHeaders.forEach((header) => {
+              if (header && directMappings.hasOwnProperty(header)) {
+                const value = directMappings[header];
+                if (value || value === 0) {  // Include 0 values
+                  firstSheetData[header] = value;
+                }
               }
+            });
+            
+            // Only add if we have data to add
+            if (Object.keys(firstSheetData).length > 0) {
+              rowsToAdd.push(firstSheetData);
             }
-          });
+          }
           
-          // Only add if we have data to add
-          if (Object.keys(firstSheetData).length > 0) {
-            await firstSheet.addRow(firstSheetData);
+          // Add all rows to the sheet
+          if (rowsToAdd.length > 0) {
+            for (const rowData of rowsToAdd) {
+              await firstSheet.addRow(rowData);
+            }
             console.log(`✓ Payment also added to ${firstSheet.title}: ${paymentData.orderId}`);
-            console.log(`  No: ${nextNo}, Cup: ${nextCup}`);
-            console.log(`  Columns: ${Object.keys(firstSheetData).join(', ')}`);
+            console.log(`  Added ${quantity} rows for quantity ordered`);
+            console.log(`  No range: ${nextNo} to ${nextNo + quantity - 1}, Cup range: ${nextCup} to ${nextCup + quantity - 1}`);
+            console.log(`  Columns: ${Object.keys(rowsToAdd[0]).join(', ')}`);
           } else {
             console.warn(`⚠ No matching columns found in "${firstSheet.title}"`);
           }
@@ -201,6 +222,7 @@ const addPaymentToSheet = async (paymentData) => {
 /**
  * Add a Cashfree webhook payment to the sheet
  * Expects webhook payload in Cashfree format
+ * Supports quantity expansion: if quantity > 1, creates multiple rows in Cup List
  */
 const addCashfreeWebhookToSheet = async (webhookPayload) => {
   try {
@@ -230,14 +252,26 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
 
     // Add amount details as custom fields too
     let itemIndex = 1;
+    let totalQuantity = 0;  // Track total quantity from all items
+    
     amountDetails.forEach((detail) => {
       customFields[`Item ${itemIndex}`] = detail.title || 'Unknown';
       customFields[`Item ${itemIndex} Value`] = detail.value || 0;
       if (detail.quantity) {
-        customFields[`Item ${itemIndex} Quantity`] = detail.quantity;
+        const itemQuantity = parseInt(detail.quantity) || 1;
+        customFields[`Item ${itemIndex} Quantity`] = itemQuantity;
+        totalQuantity += itemQuantity;
+        console.log(`📦 Item ${itemIndex}: ${detail.title}, Quantity: ${itemQuantity}`);
       }
       itemIndex++;
     });
+
+    // If no items with quantity, default totalQuantity to 1
+    if (totalQuantity === 0) {
+      totalQuantity = 1;
+    }
+
+    console.log(`📊 Total quantity to add: ${totalQuantity} rows`);
 
     const paymentData = {
       orderId: orderData.order_id || '',
@@ -248,6 +282,7 @@ const addCashfreeWebhookToSheet = async (webhookPayload) => {
       customerPhone: customerDetails.customer_phone || '',
       transactionId: orderData.transaction_id || '',
       paymentTime: webhookPayload.event_time || new Date().toISOString(),
+      quantity: totalQuantity,  // Pass total quantity to addPaymentToSheet
       customFields: {
         'Form ID': formData.form_id || '',
         'CF Form ID': formData.cf_form_id || '',
